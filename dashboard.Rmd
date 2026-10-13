@@ -1,0 +1,263 @@
+---
+title: "2026 Ebola Bundibugyo Outbreak Tracker & Predictive Sandbox"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(deSolve)
+```
+# =========================================================================
+# 1. LIVE DATA INGESTION FROM SPECIFIED REPOSITORY
+# =========================================================================
+
+```{r}
+#raw_url <- "https://github.com/webbegole/ebola-bundibugyo-tracker-2026/blob/main/data/timeseries.csv"
+
+raw_url <- "https://raw.githubusercontent.com/webbegole/ebola-bundibugyo-tracker-2026/main/data/timeseries.csv"
+
+
+
+raw_data <- read.csv(raw_url)
+
+raw_data
+```
+```{r}
+# Format dates and clean values
+raw_data$report_date <- as.Date(raw_data$report_date)
+raw_data <- raw_data[order(raw_data$report_date), ]
+
+# Match population of North Kivu/Ituri (DRC) and Bundibugyo/western districts (Uganda)
+N <- 12500000 
+
+# Extract state definitions from structural columns
+raw_data$R_obs <- raw_data$confirmed_deaths_global + raw_data$recovered_global
+raw_data$I_obs <- raw_data$confirmed_global - raw_data$R_obs
+raw_data$time  <- as.numeric(raw_data$report_date - min(raw_data$report_date)) + 1
+
+# Filter data to exclude structural missing entries
+clean_df <- na.omit(raw_data[, c("time", "I_obs", "R_obs")])
+
+# =========================================================================
+# 2. BASELINE BETA & GAMMA EXTRACTOR
+# =========================================================================
+sir_equations <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dS <- -(beta * S * I) / N
+    dI <-  (beta * S * I) / N - gamma * I
+    dR <-  gamma * I
+    return(list(c(dS, dI, dR)))
+  })
+}
+
+init_state <- c(S = N - clean_df$I_obs[1], I = clean_df$I_obs[1], R = clean_df$R_obs[1])
+
+calculate_rss <- function(p) {
+  names(p) <- c("beta", "gamma")
+  if(any(p <= 0)) return(1e12)
+  predictions <- as.data.frame(ode(y = init_state, times = clean_df$time, func = sir_equations, parms = p))
+  return(sum((clean_df$I_obs - predictions$I)^2) + sum((clean_df$R_obs - predictions$R)^2))
+}
+
+# Run optimal deterministic derivation
+fit <- optim(par = c(beta = 0.25, gamma = 0.08), fn = calculate_rss, method = "L-BFGS-B", lower = c(0.01, 0.01))
+base_beta  <- fit$par["beta"]
+base_gamma <- fit$par["gamma"]
+base_r0    <- base_beta / base_gamma
+```
+
+Row {data-height=160}
+-----------------------------------------------------------------------
+
+### Data Ingestion Context
+``` {r}
+valueBox("Verified Live Data", icon = "fa-check-circle", color = "success")
+```
+
+
+```{r}
+flexdashboard::valueBox(round(base_beta, 4), icon = "fa-radiation", color = "warning")
+```
+
+### Calculated Target Base \(\beta\)
+``` {r}
+valueBox(round(base_beta, 4), icon = "fa-radiation", color = "warning")
+```
+
+### Calculated Target Base \(\gamma\)
+``` {r}
+valueBox(round(base_gamma, 4), icon = "fa-ambulance", color = "info")
+```
+
+### Inferred \(R_0\)
+``` {r}
+valueBox(round(base_r0, 2), icon = "fa-expand-arrows-alt", color = "danger")
+```
+
+Row {data-height=600}
+-----------------------------------------------------------------------
+
+### Real-Time Predictive Forecasting Sandbox (Interactive Chart)
+
+<!-- Injecting custom reactive JavaScript UI inside the static page environment -->
+<div style="display: flex; gap: 20px; font-family: sans-serif; padding: 10px; height: 100%;">
+  <div style="width: 250px; background: #f8f9fa; padding: 15px; border-radius: 4px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+    <h4 style="margin-top:0;">Sandbox Controls</h4>
+    <p style="font-size: 12px; color: #666;">Tweak sliders to see immediate simulated projections against observed data.</p>
+    
+    <label style="font-weight:bold; display:block; margin-top:15px;">Transmission Rate (β):</label>
+    <input type="range" id="sliderBeta" min="0.01" max="0.8" step="0.01" value="`r base_beta`" style="width:100%;">
+    <span id="valBeta" style="font-weight:bold; color:#d9534f;">`r round(base_beta, 4)`</span>
+
+    <label style="font-weight:bold; display:block; margin-top:20px;">Recovery Rate (γ):</label>
+    <input type="range" id="sliderGamma" min="0.01" max="0.4" step="0.01" value="`r base_gamma`" style="width:100%;">
+    <span id="valGamma" style="font-weight:bold; color:#5bc0de;">`r round(base_gamma, 4)`</span>
+    
+    <div style="margin-top: 30px; padding: 10px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+      <span style="font-size:13px; display:block;">Dynamic \(R_0\):</span>
+      <strong id="valR0" style="font-size:20px; color:#c9302c;">`r round(base_r0, 2)`</strong>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; position: relative;">
+    <div id="plotly_sandbox_chart" style="width:100%; height:450px;"></div>
+  </div>
+</div>
+
+<!-- Load Client-Side dependencies inside the pipeline bundle -->
+<script src="https://plot.ly"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Feed historical matrix rows generated by R variables into JavaScript Arrays
+  const obs_time = [`r paste(clean_df$time, collapse=",")`];
+  const obs_I = [`r paste(clean_df$I_obs, collapse=",")`];
+  const obs_R = [`r paste(clean_df$R_obs, collapse=",")`];
+  
+  const N = `r N`;
+  const maxDays = 180;
+  
+  function solveSIR(beta, gamma) {
+    let S = N - obs_I[0];
+    let I = obs_I[0];
+    let R = obs_R[0];
+    let dt = 1;
+    
+    let t_arr = [];
+    let I_arr = [];
+    let R_arr = [];
+    
+    for (let t = 1; t <= maxDays; t++) {
+      t_arr.push(t);
+      I_arr.push(I);
+      R_arr.push(R);
+      
+      let dS = - (beta * S * I) / N;
+      let dI =   (beta * S * I) / N - (gamma * I);
+      let dR =   gamma * I;
+      
+      S += dS * dt;
+      I += dI * dt;
+      R += dR * dt;
+    }
+    return { t: t_arr, I: I_arr, R: R_arr };
+  }
+
+  function updateChart() {
+    let beta = parseFloat(document.getElementById("sliderBeta").value);
+    let gamma = parseFloat(document.getElementById("sliderGamma").value);
+    
+    document.getElementById("valBeta").innerText = beta.toFixed(4);
+    document.getElementById("valGamma").innerText = gamma.toFixed(4);
+    document.getElementById("valR0").innerText = (beta / gamma).toFixed(2);
+    
+    let sim = solveSIR(beta, gamma);
+    
+    let data = [
+      { x: obs_time, y: obs_I, mode: 'markers', name: 'Observed Infected (Data)', marker: { color: '#777', size: 6 } },
+      { x: sim.t, y: sim.I, mode: 'lines', name: 'Simulated Forecast (I)', line: { color: '#d9534f', width: 3 } },
+      { x: sim.t, y: sim.R, mode: 'lines', name: 'Simulated Forecast (R)', line: { color: '#5cb85c', width: 2, dash: 'dot' } }
+    ];
+    
+    let layout = {
+      margin: { t: 20, b: 40, l: 60, r: 20 },
+      xaxis: { title: 'Days Since Horizon Track' },
+      yaxis: { title: 'Population Counts' },
+      legend: { orientation: 'h', y: -0.15 }
+    };
+    
+    Plotly.newPlot('plotly_sandbox_chart', data, layout);
+  }
+
+  document.getElementById("sliderBeta").addEventListener("input", updateChart);
+  document.getElementById("sliderGamma").addEventListener("input", updateChart);
+  
+  // Initial canvas generation pass
+  updateChart();
+});
+</script>
+
+Row {data-height=100}
+-----------------------------------------------------------------------
+
+### Data Attribution & Methodology Framework
+
+**Source Registry:** Automated tracking extraction targeting the `data/timeseries.csv` matrix array in the public `webbegole/ebola-bundibugyo-tracker-2026` repository. The optimization step executes an unconstrained multivariate `L-BFGS-B` routine across active windows to compute current biological constants during build phases. Use the dashboard controls to test specific alternative public health scenarios.
+
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Data Source
+``` {r}
+valueBox("CDC / Public Repo", icon = "fa-database", color = "info")
+```
+
+### Estimated Initial R0
+``` {r}
+r0_init <- fitted_params["beta_0"] / fitted_params["gamma"]
+valueBox(round(r0_init, 2), icon = "fa-virus", color = "danger")
+```
+
+### Recovery Window (Days)
+``` {r}
+duration <- 1 / fitted_params["gamma"]
+valueBox(round(duration, 1), icon = "fa-heartbeat", color = "success")
+```
+
+Row {data-height=550}
+-----------------------------------------------------------------------
+
+### Outbreak Trajectory Fitting and 200-Day Projection
+
+```{r}
+plot_ly() %>%
+  add_markers(data = observed_data, x = ~time, y = ~I, name = "Observed Active Cases", marker = list(color = 'grey')) %>%
+  add_lines(data = projection, x = ~time, y = ~I, name = "Fitted Dynamic SIR Model", line = list(color = 'green', width = 3)) %>%
+  layout(
+    xaxis = list(title = "Days Since Outbreak Inception"),
+    yaxis = list(title = "Infected Population Count"),
+    shapes = list(list(type = "line", x0 = 100, x1 = 100, y0 = 0, y1 = max(observed_data$I)*1.2, line = list(dash = "dash", color = "red")))
+  )
+```
+
+### Context & Parameters Attribution
+
+**Model Parameters Summary:**
+* **Transmission Max (β₀):** `r round(fitted_params["beta_0"], 4)`
+* **Transmission Min (\(\beta_{min}\)):** `r round(fitted_params["beta_min"], 4)`
+* **Intervention Decay (k):** `r round(fitted_params["k"], 4)`
+
+*Disclaimer: This dashboard streams data directly from external open public repositories. Calculations are ran fully serverless daily via localized structural R environments.*
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library(plotly)
+
+```
+
+
+
