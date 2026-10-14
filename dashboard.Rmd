@@ -63,7 +63,7 @@ forecast_7d <- as.data.frame(ode(y = init_train_state, times = train_horizon:(tr
 Row {data-height=140}
 -----------------------------------------------------------------------
 
-### Target Baseline Transmission (\(\beta\))
+### Target Baseline Transmission (β)
 ``` {r}
 valueBox(round(current_beta, 4), icon = "fa-radiation", color = "warning")
 ```
@@ -73,7 +73,7 @@ valueBox(round(current_beta, 4), icon = "fa-radiation", color = "warning")
 valueBox(round(current_r0, 2), icon = "fa-chart-line", color = "danger")
 ```
 
-### Current Clinical Recovery Rate (\(\gamma\))
+### Current Clinical Recovery Rate (γ)
 ``` {r}
 valueBox(round(current_gamma, 4), icon = "fa-heartbeat", color = "success")
 ```
@@ -121,12 +121,13 @@ subplot(p1, p2, nrows = 2, shareX = TRUE, titleY = TRUE)
 <div style="display: flex; gap: 15px; padding: 10px; height: 100%;">
   <div style="width: 260px; background: #f8f9fa; padding: 12px; border-radius: 4px; font-family:sans-serif; font-size:12px;">
     <h5 style="font-weight:bold; margin-top:0;">Neural Optimization Layer</h5>
-    <p>This panel uses a client-side neural network architecture that inherits parameters (\(\beta\) and \(\gamma\)) to calculate non-linear short-term adjustments.</p>
+    <p>This panel uses a client-side neural network architecture that inherits parameters (β and γ) to calculate non-linear short-term adjustments.</p>
     <button onclick="runNeuralTune()" style="background:#0275d8; color:#fff; border:0; padding:8px 12px; border-radius:4px; font-weight:bold; cursor:pointer; width:100%;">Fine-Tune Next 7 Days</button>
   </div>
   <div style="flex-grow: 1;" id="neural_chart_pane"></div>
 </div>
 
+<script src="https://plot.ly"></script>
 <script>
 function runNeuralTune() {
   const last_I = `r tail(clean_df$I_obs, 1)`;
@@ -145,6 +146,18 @@ function runNeuralTune() {
     current_val = hidden_1 + hidden_2 * 0.15;
     nn_predictions.push(current_val);
   }
+  
+  let traces = [{ x: nn_times, y: nn_predictions, mode: 'lines+markers', name: 'Neural Network 7d Tuning Projection', line: { color: '#0275d8', width: 3 } }];
+  let layout = { margin: { t:20, r:20, b:40, l:60 }, xaxis: { title: 'Timeline Days' }, yaxis: { title: 'Predicted Value Vector' } };
+  Plotly.newPlot('neural_chart_pane', traces, layout);
+}
+
+// Fixed bracket scope execution closure
+window.onload = function() {
+  runNeuralTune();
+};
+</script>
+
   
   let traces = [{ x: nn_times, y: nn_predictions, mode: 'lines+markers', name: 'Neural Network 7d Tuning Projection', line: { color: '#0275d8', width: 3 } }];
   let layout = { margin: { t:20, r:20, b:40, l:60 }, xaxis: { title: 'Timeline Days' }, yaxis: { title: 'Predicted Value Vector' } };
