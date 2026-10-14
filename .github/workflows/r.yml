@@ -1,4 +1,4 @@
-name: Streamlined Sequential Analytics Pipeline
+name: Ebola Analytics Pipeline
 
 on:
   schedule:
@@ -12,57 +12,54 @@ jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out your repository workspace
+      - name: Checkout local workspace
         uses: actions/checkout@v4
 
-      - name: Download Live Remote Data via GitHub Core Network
+      - name: Fetch remote repository data
         uses: actions/checkout@v4
         with:
           repository: webbegole/ebola-bundibugyo-tracker-2026
           path: external_repo_clone
 
-      - name: Stage Data Table File onto Local Disk
+      - name: Extract data spreadsheet
         run: |
           cp external_repo_clone/data/timeseries.csv ./downloaded_timeseries.csv
           rm -rf external_repo_clone
 
-      - name: Configure R Engine Environment
+      - name: Install R Environment
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: '4.4.3'
 
-      - name: Load Base Compiler Tooling Requirements
+      - name: Install System Utilities
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc libcurl4-openssl-dev libssl-dev libxml2-dev
 
-      - name: Provision R Matrix Libraries
+      - name: Install Modeling Libraries
         run: |
           Rscript -e 'install.packages(c("rmarkdown", "flexdashboard", "deSolve", "plotly"))'
 
-      - name: Run Incremental Data Sync
+      - name: Run Incremental Sync
         run: |
           Rscript incremental_fetch.R
 
-      - name: Compile Layout Visuals
+      - name: Compile Dashboard
         run: |
           Rscript -e 'rmarkdown::render("dashboard.Rmd", output_file = "index.html")'
 
-      - name: Commit Cache Delta Changes to Repository
+      - name: Save Cache Data
         run: |
           git config --global user.name "Automated Pipeline"
           git config --global user.email "pipeline@github-actions.internal"
-          git add data_cache.csv || echo "No cache file to add"
-          git commit -m "Automated Pipeline: Appended incremental data rows [skip ci]" || echo "No changes to commit"
-          git push origin main || echo "No changes to push"
+          git add data_cache.csv || echo "No files"
+          git commit -m "Automated update [skip ci]" || echo "No changes"
+          git push origin main || echo "No push"
 
-      - name: Push Build Assets Live to GitHub Pages
+      - name: Publish Website Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
           keep_files: true
-          publish_dir: ./
-          keep_files: true
-
 
