@@ -20,8 +20,19 @@ jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repo contents
+      - name: Check out your repository workspace
         uses: actions/checkout@v4
+
+      - name: Download Live Remote Data via GitHub Core Network
+        uses: actions/checkout@v4
+        with:
+          repository: webbegole/ebola-bundibugyo-tracker-2026
+          path: external_repo_clone
+
+      - name: Stage Data Table File onto Local Disk
+        run: |
+          cp external_repo_clone/data/timeseries.csv ./downloaded_timeseries.csv
+          rm -rf external_repo_clone
 
       - name: Configure R Engine Environment
         uses: r-lib/actions/setup-r@v2
@@ -37,13 +48,6 @@ jobs:
         run: |
           Rscript -e 'install.packages(c("rmarkdown", "flexdashboard", "deSolve", "plotly"))'
 
-      - name: Reset Network DNS and Download Live Remote Data
-        run: |
-          # 1. Force the Linux runner to use a reliable public DNS server
-          sudo echo "nameserver 8.8.8.8" > /etc/resolv.conf
-          
-          # 2. Run curl completely bare without quotes to avoid invisible unicode character traps
-          curl -v -L --http1.1 -o downloaded_timeseries.csv https://githubusercontent.com
       - name: Run Incremental Data Sync
         run: |
           Rscript incremental_fetch.R
@@ -64,6 +68,9 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          keep_files: true
+
           publish_dir: ./
           keep_files: true
 
