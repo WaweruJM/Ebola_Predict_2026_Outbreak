@@ -37,9 +37,13 @@ jobs:
         run: |
           Rscript -e 'install.packages(c("rmarkdown", "flexdashboard", "deSolve", "plotly"))'
 
-      - name: Download Live Remote Data via Linux Command Line
-        run: curl -L -o downloaded_timeseries.csv "https://githubusercontent.com"
-
+      - name: Reset Network DNS and Download Live Remote Data
+        run: |
+          # 1. Force the Linux runner to use a reliable public DNS server
+          sudo echo "nameserver 8.8.8.8" > /etc/resolv.conf
+          
+          # 2. Run curl completely bare without quotes to avoid invisible unicode character traps
+          curl -v -L --http1.1 -o downloaded_timeseries.csv https://githubusercontent.com
       - name: Run Incremental Data Sync
         run: |
           Rscript incremental_fetch.R
