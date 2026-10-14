@@ -1,25 +1,16 @@
 # =========================================================================
-# INCREMENTAL SELECTION ARCHITECTURE WITH SECURE NETWORK CONNECTIVITY
+# INCREMENTAL SELECTION ARCHITECTURE - LOCAL DISK PROCESSING
 # =========================================================================
-target_raw_url <- "https://githubusercontent.com"
 temp_download_path <- "downloaded_timeseries.csv"
 cache_filename <- "data_cache.csv"
 N <- 12500000 # Population scale anchor constraint constant
 
-# 1. SECURE DOWNLOAD STEP BYPASSING THE FIREWALL BLOCK
-tryCatch({
-  # Explicitly masquerade as a secure client browser to guarantee connection access
-  download.file(
-    url = target_raw_url, 
-    destfile = temp_download_path, 
-    method = "libcurl", 
-    headers = c("User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) R-Pipeline-Agent")
-  )
-}, error = function(e) {
-  stop(paste("[CRITICAL ERROR] Secure network download failed:", e$message))
-})
+# Verify the command line downloaded the file successfully
+if (!file.exists(temp_download_path)) {
+  stop("[CRITICAL ERROR] The command line data payload was not found on the local disk.")
+}
 
-# Read the safely downloaded file off the local disk space
+# Read the safely downloaded file directly off the local disk space
 remote_df <- read.csv(temp_download_path)
 remote_df$report_date <- as.Date(remote_df$report_date)
 
@@ -29,7 +20,7 @@ remote_df$I_obs <- remote_df$confirmed_global - remote_df$R_obs
 remote_processed <- na.omit(remote_df[, c("report_date", "I_obs", "R_obs")])
 remote_processed <- remote_processed[order(remote_processed$report_date), ]
 
-# 2. HELPER FUNCTION TO CALCULATE EPIDEMIOLOGICAL PARAMETERS ON THE FLY
+# HELPER FUNCTION TO CALCULATE EPIDEMIOLOGICAL PARAMETERS ON THE FLY
 compute_row_parameters <- function(df_matrix) {
   total_rows <- nrow(df_matrix)
   beta_vector  <- rep(0.25, total_rows)
@@ -53,12 +44,12 @@ compute_row_parameters <- function(df_matrix) {
       perf_vector[i] <- (mean(abs(past_observed - mean(past_observed))) / pmax(1, mean(past_observed))) * 100
     }
   }
-  beta_vector[1:6]  <- beta_vector[7]; gamma_vector[1:6] <- gamma_vector[7]; r0_vector[1:6] <- r0_vector[7]
-  perf_vector[1:14] <- perf_vector[15]
+  beta_vector[1:6]  <- beta_vector; gamma_vector[1:6] <- gamma_vector; r0_vector[1:6] <- r0_vector
+  perf_vector[1:14] <- perf_vector
   return(data.frame(beta = beta_vector, gamma = gamma_vector, r0 = r0_vector, perf_score = perf_vector))
 }
 
-# 3. CONFIGURE PERSISTENT INTEGRATION LAYER SUB-SELECTION
+# CONFIGURE PERSISTENT INTEGRATION LAYER SUB-SELECTION
 if (file.exists(cache_filename)) {
   local_cache <- read.csv(cache_filename)
   local_cache$report_date <- as.Date(local_cache$report_date)
@@ -90,8 +81,6 @@ if (file.exists(cache_filename)) {
 
 # Clean up temp file to keep repository workspace neat
 if(file.exists(temp_download_path)) { file.remove(temp_download_path) }
-  
-  calculated_metrics <- compute_row_parameters(remote_processed)
   initial_payload <- cbind(remote_processed, calculated_metrics)
   
   write.csv(initial_payload, cache_filename, row.names = FALSE)
