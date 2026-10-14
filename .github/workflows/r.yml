@@ -38,8 +38,7 @@ jobs:
           Rscript -e 'install.packages(c("rmarkdown", "flexdashboard", "deSolve", "plotly"))'
 
       - name: Download Live Remote Data via Linux Command Line
-        run: |
-          curl -L -o downloaded_timeseries.csv "https://githubusercontent.com"
+        run: curl -L -o downloaded_timeseries.csv "https://githubusercontent.com"
 
       - name: Run Incremental Data Sync
         run: |
