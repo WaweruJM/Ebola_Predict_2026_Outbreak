@@ -1,22 +1,42 @@
 # =========================================================================
-# INCREMENTAL SELECTION ARCHITECTURE - LOCAL DISK PROCESSING
+# INCREMENTAL SELECTION ARCHITECTURE - REINFORCED PROCESSING
 # =========================================================================
 temp_download_path <- "downloaded_timeseries.csv"
 cache_filename <- "data_cache.csv"
 N <- 12500000 # Population scale anchor constraint constant
 
-# Verify the command line downloaded the file successfully
 if (!file.exists(temp_download_path)) {
-  stop("[CRITICAL ERROR] The command line data payload was not found on the local disk.")
+  stop("[CRITICAL ERROR] The data payload file was not found on disk.")
 }
 
-# Read the safely downloaded file directly off the local disk space
-remote_df <- read.csv(temp_download_path)
+# Read data safely
+remote_df <- read.csv(temp_download_path, stringsAsFactors = FALSE)
+
+# --- DYNAMIC DATE COLUMN DETECTION ---
+# Find which column contains the date information, matching variations case-insensitively
+date_col_idx <- grep("date", colnames(remote_df), ignore.case = TRUE)
+
+if (length(date_col_idx) == 0) {
+  stop("[CRITICAL ERROR] Could not locate a date column. Available columns are: ", 
+       paste(colnames(remote_df), collapse = ", "))
+}
+
+# Standardize the date column name for the rest of the script
+colnames(remote_df)[date_col_idx[1]] <- "report_date"
+
+# Safely convert to R Date object without dropping rows
 remote_df$report_date <- as.Date(remote_df$report_date)
 
-# Derive missing active case dimensions
+# Verify conversion success
+if (all(is.na(remote_df$report_date))) {
+  stop("[CRITICAL ERROR] Date conversion failed. Please check the text format of your source dates.")
+}
+
+# --- DERIVE ACTIVE COMPARTMENTS ---
 remote_df$R_obs <- remote_df$confirmed_deaths_global + remote_df$recovered_global
 remote_df$I_obs <- remote_df$confirmed_global - remote_df$R_obs
+
+# Subset and clean missing values
 remote_processed <- na.omit(remote_df[, c("report_date", "I_obs", "R_obs")])
 remote_processed <- remote_processed[order(remote_processed$report_date), ]
 
@@ -81,6 +101,8 @@ if (file.exists(cache_filename)) {
 
 # Clean up temp file to keep repository workspace neat
 if(file.exists(temp_download_path)) { file.remove(temp_download_path) }
+cat("[SUCCESS] Pipeline completed calculations data pass smoothly.\n")
+
   initial_payload <- cbind(remote_processed, calculated_metrics)
   
   write.csv(initial_payload, cache_filename, row.names = FALSE)
