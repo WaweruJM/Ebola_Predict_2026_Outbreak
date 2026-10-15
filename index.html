@@ -1,225 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Regional Health Data Hub | WHO AFRO Mirror</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-  <style>
-    :root { --who-blue: #0078d4; --card-bg: #ffffff; --text-primary: #333333; }
-    body { font-family: "Roboto", sans-serif; margin: 0; padding: 0; background: #f4f6f9; color: var(--text-primary); }
-    header { background: var(--who-blue); color: #fff; padding: 15px 30px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    header h1 { margin: 0; font-size: 22px; font-weight: 700; }
-    .branding { font-size: 12px; opacity: 0.85; text-transform: uppercase; font-weight: bold; }
-    .grid-container { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 25px; padding: 30px; max-width: 1600px; margin: 0 auto; }
-    .left-graphs-panel, .right-kpi-panel { display: flex; flex-direction: column; gap: 20px; }
-    .card { background: var(--card-bg); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e1e4e8; padding: 20px; }
-    .graph-card { min-height: 420px; }
-    .kpi-title { font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; margin-bottom: 5px; letter-spacing: 0.5px; }
-    .kpi-value { font-size: 32px; font-weight: 700; color: #111; line-height: 1; }
-    .kpi-value.danger { color: #d9534f; }
-    .kpi-value.success { color: #5cb85c; }
-    .kpi-value.warning { color: #f0ad4e; }
-    .kpi-value.info { color: #0275d8; }
-    .sandbox-controls { background: #eef2f7; padding: 15px; border-radius: 4px; margin-top: 10px; }
-    .slider-group { margin-bottom: 12px; }
-    .slider-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
-    input[type=range] { width: 100%; }
-    .footer-banner { font-size: 11px; color: #777; text-align: center; padding: 15px; margin-top: 20px; border-top: 1px solid #ddd; }
-    @media (max-width: 1100px) { .grid-container { grid-template-columns: 1fr; } }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ebola Disease Outbreak Analysis Portal 2026</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-<header>
-  <div>
-    <h1>Ebola Disease Outbreak Analysis Portal</h1>
-    <div class="branding">WHO-AFRO Mirror Platform Alignment Matrix</div>
-  </div>
-  <div style="text-align: right; font-size: 12px;">Data Ingestion: <b>Live Incremental Cache</b></div>
-</header>
-<div class="grid-container">
-  <div class="left-graphs-panel">
-    <div class="card graph-card">
-      <div id="outbreak_sandbox_plot" style="width:100%; height:380px;"></div>
-    </div>
-    <div class="card graph-card">
-      <div id="sir_dynamics_plot" style="width:100%; height:380px;"></div>
-    </div>
-    <div class="card graph-card">
-      <div id="parameter_trends_plot" style="width:100%; height:380px;"></div>
-    </div>
-  </div>
-  <div class="right-kpi-panel">
-    <div style="font-weight:bold; font-size:14px; border-left:4px solid #0078d4; padding-left:8px;">CUMULATIVE CASE TELEMETRY</div>
-    <div class="card"><div class="kpi-title">Total Laboratory Confirmed Cases</div>
-      <div class="kpi-value warning">9,167</div></div>
-    <div class="card"><div class="kpi-title">Total Registered Recoveries</div>
-      <div class="kpi-value success">2,437</div></div>
-    <div class="card"><div class="kpi-title">Total Registered Fatalities</div>
-      <div class="kpi-value danger">4,413</div></div>
-    <div style="font-weight:bold; font-size:14px; border-left:4px solid #0078d4; padding-left:8px; margin-top:15px;">CURRENT BIOLOGICAL COEFFICIENTS</div>
-    <div class="card"><div class="kpi-title">Effective Transmission Rate (beta)</div>
-      <div class="kpi-value info" id="kpi_beta">0.0106</div></div>
-    <div class="card"><div class="kpi-title">Clinical Recovery Rate (gamma)</div>
-      <div class="kpi-value success" id="kpi_gamma">0.01</div></div>
-    <div class="card"><div class="kpi-title">Effective Reproduction Number (R_t)</div>
-      <div class="kpi-value danger" id="kpi_r0">1.06</div></div>
-    <div class="card">
-      <div class="kpi-title">Epidemiological Forecasting Sandbox</div>
-      <div class="sandbox-controls">
-        <div class="slider-group">
-          <label>Transmission Rate (beta): <span id="vBeta">
-0.0106
-</span></label>
-          <input type="range" id="inputBeta" min="0.01" max="0.8" step="0.01" value="
-0.01
-">
+
+    <!-- ============================================
+         TOP MARQUEE BANNER (right-to-left)
+         ============================================ -->
+    <div class="top-marquee">
+        <div class="marquee-track">
+            <span class="marquee-text">
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+            </span>
         </div>
-        <div class="slider-group">
-          <label>Recovery Rate (gamma): <span id="vGamma">
-0.01
-</span></label>
-          <input type="range" id="inputGamma" min="0.01" max="0.4" step="0.01" value="
-0.01
-">
-        </div>
-        <div class="slider-group" style="margin-top:8px; font-size:11px; color:#555;">
-          <label>Forecast Horizon (days): <span id="vHorizon">60</span></label>
-          <input type="range" id="inputHorizon" min="14" max="180" step="1" value="60">
-        </div>
-      </div>
     </div>
-  </div>
-</div>
-<div class="footer-banner">
-  Ref. data.afro.who.int Mirror Alignment Map. Continuous tracking calculated serverless daily via localized structural R environments.
-</div>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  const dateLabels = ["15 May","16 May","17 May","18 May","19 May","20 May","21 May","22 May","23 May","24 May","25 May","26 May","27 May","28 May","29 May","30 May","31 May","01 Jun","02 Jun","03 Jun","04 Jun","05 Jun","06 Jun","07 Jun","08 Jun","09 Jun","10 Jun","11 Jun","12 Jun","13 Jun","14 Jun","15 Jun","16 Jun","17 Jun","18 Jun","19 Jun","20 Jun","21 Jun","22 Jun","23 Jun","24 Jun","25 Jun","26 Jun","28 Jun","29 Jun","30 Jun","01 Jul","02 Jul","03 Jul","04 Jul","05 Jul","06 Jul","07 Jul","08 Jul","09 Jul","10 Jul","11 Jul","12 Jul","13 Jul","14 Jul","15 Jul","16 Jul","17 Jul","18 Jul","19 Jul","20 Jul","21 Jul","22 Jul","23 Jul","24 Jul","25 Jul","26 Jul","27 Jul","28 Jul","29 Jul","30 Jul","31 Jul","01 Aug","02 Aug","03 Aug","04 Aug","05 Aug","06 Aug","07 Aug","08 Aug","09 Aug","10 Aug","11 Aug","12 Aug","13 Aug","14 Aug","15 Aug","16 Aug","17 Aug","18 Aug","19 Aug","20 Aug","21 Aug","22 Aug","23 Aug","24 Aug","25 Aug","26 Aug","27 Aug","28 Aug","29 Aug","30 Aug","31 Aug","01 Sep","02 Sep","03 Sep","04 Sep","05 Sep","06 Sep","07 Sep","08 Sep","09 Sep","10 Sep","11 Sep","12 Sep","13 Sep","14 Sep","15 Sep","16 Sep","17 Sep","18 Sep","19 Sep","20 Sep","21 Sep","22 Sep","23 Sep","24 Sep","25 Sep","26 Sep","27 Sep","28 Sep","29 Sep","30 Sep","01 Oct","02 Oct","03 Oct","05 Oct","06 Oct","07 Oct","08 Oct","09 Oct","10 Oct","11 Oct","12 Oct","13 Oct"];
-  const obs_I = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,234,330,330,336,351,388,388,521,553,546,590,619,658,671,689,827,774,802,822,827,862,873,958,946,985,1002,1023,1061,1133,1133,1150,1220,1253,1278,1293,1374,1355,1431,1477,1500,1538,1570,1648,1633,1710,2145,2145,2202,2288,1880,1956,1993,2032,2388,2435,2521,2681,2681,2765,2829,2908,2956,3010,3042,3077,3127,3199,3262,3312,3383,3447,3514,3565,3650,3702,3753,3839,3907,3962,4016,4095,4140,4210,4278,4316,4371,4413,4446,4503,4547,4620,4677,4719,4779,4813,4869,4943,5008,5058,5125,5169,5234,5297,5353,5423,5490,5534,5594,5630,5679,5720,5752,5795,5833,5840,5871,5926,5947,5958,5999,6030,6068,6105,6140,6196,6231,6370,6409,6462,6498,6528,6579,6625,6680,6730];
-  const obs_R = [80,87,87,132,132,139,176,176,177,223,223,223,223,223,223,0,0,0,0,8,9,12,13,16,23,27,35,37,37,40,0,53,54,72,88,90,102,110,122,129,137,153,163,195,195,204,207,228,245,256,271,290,298,303,313,313,324,336,351,384,0,0,0,0,485,488,501,525,538,559,575,602,602,616,634,645,670,685,727,746,768,795,812,829,847,868,888,905,937,984,995,1025,1059,1080,1110,1134,1171,1186,1201,1219,1234,1264,1288,1312,1337,1346,1385,1402,1428,1458,1494,1514,1535,1567,1582,1609,1630,1666,1690,1711,1731,1745,1772,1795,1817,1842,1883,1898,1921,1954,1970,1985,2020,2052,2089,2107,2124,2140,2181,2201,2232,2254,2278,2288,2311,2339,2357,2375,2408,2437];
-  const beta_arr = [0.2500,0.2500,0.2500,0.2500,0.2500,0.2500,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.8000,0.1021,0.0913,0.1025,0.0995,0.1027,0.0952,0.1049,0.0506,0.0447,0.0684,0.0537,0.0495,0.0464,0.0473,0.0496,0.0303,0.0481,0.0418,0.0420,0.0420,0.0407,0.0441,0.0426,0.0426,0.0384,0.0447,0.0459,0.0437,0.0308,0.0431,0.0393,0.0391,0.0376,0.0358,0.0366,0.0289,0.0384,0.0281,0.0334,0.0346,0.0304,0.0302,0.0271,0.0328,0.0285,0.0278,0.0331,0.0589,0.0572,0.0585,0.0639,0.0596,0.0605,0.0351,0.0357,0.0329,0.0244,0.0285,0.0254,0.0243,0.0243,0.0243,0.0238,0.0242,0.0254,0.0257,0.0237,0.0250,0.0261,0.0244,0.0254,0.0256,0.0256,0.0237,0.0234,0.0240,0.0222,0.0211,0.0200,0.0192,0.0177,0.0165,0.0161,0.0154,0.0162,0.0170,0.0163,0.0172,0.0164,0.0170,0.0172,0.0167,0.0173,0.0170,0.0171,0.0166,0.0166,0.0162,0.0163,0.0163,0.0157,0.0156,0.0142,0.0138,0.0129,0.0123,0.0122,0.0114,0.0108,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0107,0.0103,0.0132,0.0133,0.0135,0.0130,0.0124,0.0124,0.0100,0.0103,0.0106];
-  const gamma_arr = [0.0800,0.0800,0.0800,0.0800,0.0800,0.0800,0.4000,0.4000,0.4000,0.4000,0.4000,0.4000,0.4000,0.4000,0.4000,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0206,0.0115,0.0133,0.0108,0.0100,0.0112,0.0105,0.0140,0.0119,0.0120,0.0111,0.0113,0.0119,0.0100,0.0103,0.0112,0.0118,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0367,0.0387,0.0398,0.0412,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100,0.0100];
-  const r0_arr = [3.12,3.12,3.12,3.12,3.12,3.12,2.00,2.00,2.00,2.00,2.00,2.00,2.00,2.00,2.00,80.00,80.00,80.00,80.00,80.00,80.00,10.21,9.13,10.25,9.95,10.27,9.52,10.49,5.06,4.47,6.84,5.37,4.95,4.64,4.73,4.96,1.47,4.20,3.14,3.89,4.20,3.64,4.20,3.05,3.58,3.20,4.04,4.07,3.67,3.08,4.21,3.50,3.31,3.76,3.58,3.66,2.89,3.84,2.81,3.34,3.46,3.04,3.02,2.71,3.28,2.85,0.76,0.85,1.48,1.39,5.85,6.39,5.96,6.05,3.51,3.57,3.29,2.44,2.85,2.54,2.43,2.43,2.43,2.38,2.42,2.54,2.57,2.37,2.50,2.61,2.44,2.54,2.56,2.56,2.37,2.34,2.40,2.22,2.11,2.00,1.92,1.77,1.65,1.61,1.54,1.62,1.70,1.63,1.72,1.64,1.70,1.72,1.67,1.73,1.70,1.71,1.66,1.66,1.62,1.63,1.63,1.57,1.56,1.42,1.38,1.29,1.23,1.22,1.14,1.08,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.07,1.03,1.32,1.33,1.35,1.30,1.24,1.24,1.00,1.03,1.06];
-  const N = 12500000;
 
-  // ---- Core SIR integrator (Euler, dt = 1 day) --------------------
-  function simulateSIR(beta, gamma, horizon) {
-    const last_I = obs_I[obs_I.length - 1];
-    const last_R = obs_R[obs_R.length - 1];
-    let S = Math.max(0, N - last_I - last_R);
-    let I = last_I;
-    let R = last_R;
-    const S_arr = [S], I_arr = [I], R_arr = [R];
-    for (let t = 0; t < horizon; t++) {
-      const dS = -(beta * S * I) / N;
-      const dI =  (beta * S * I) / N - gamma * I;
-      const dR =  gamma * I;
-      S = Math.max(0, S + dS);
-      I = Math.max(0, I + dI);
-      R = Math.max(0, R + dR);
-      S_arr.push(S); I_arr.push(I); R_arr.push(R);
-    }
-    return { S: S_arr, I: I_arr, R: R_arr };
-  }
+    <!-- ============================================
+         FIXED HEADER with centered title + virus
+         ============================================ -->
+    <header class="portal-header">
+        <div class="header-inner">
+            <div class="virus-icon left-virus" aria-hidden="true">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Ebola_virus_%28Ebola_virus%29.jpg/240px-Ebola_virus_%28Ebola_virus%29.jpg"
+                     alt="Ebola virus" onerror="this.style.display='none'; this.parentElement.textContent='🦠';">
+            </div>
+            <div class="header-title-block">
+                <h1 class="portal-title">Ebola Disease Outbreak Analysis Portal</h1>
+                <div class="live-indicator">
+                    <span class="blink-dot" aria-hidden="true"></span>
+                    <span class="live-text">Daily Updated Data Analysis</span>
+                </div>
+            </div>
+            <div class="virus-icon right-virus" aria-hidden="true">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Ebola_virus_%28Ebola_virus%29.jpg/240px-Ebola_virus_%28Ebola_virus%29.jpg"
+                     alt="Ebola virus" onerror="this.style.display='none'; this.parentElement.textContent='🦠';">
+            </div>
+        </div>
+    </header>
 
-  // ---- Graph 1: Observed + short forecast -------------------------
-  function renderOutbreak(beta, gamma, horizon) {
-    const sim = simulateSIR(beta, gamma, Math.min(horizon, 30));
-    const ext_dates = [...dateLabels];
-    for (let i = 1; i < sim.I.length; i++) ext_dates.push("+d" + i);
+    <!-- ============================================
+         MAIN CONTENT
+         ============================================ -->
+    <main class="portal-main">
 
-    const trace_obs = { x: dateLabels, y: obs_I, mode: "markers",
-      name: "Observed Active Cases", marker: { color: "#333", size: 6 } };
-    const trace_sim = { x: ext_dates, y: sim.I, mode: "lines",
-      name: "Model Path (short horizon)",
-      line: { color: "#cc0000", width: 3 } };
+        <!-- ROW 1: Cumulative Case Telemetry -->
+        <section class="card-row" aria-label="Cumulative Case Telemetry">
+            <h2 class="row-heading">Cumulative Case Telemetry</h2>
+            <div class="cards-grid" id="caseTelemetryCards">
+                <!-- Populated by JS -->
+            </div>
+        </section>
 
-    Plotly.newPlot("outbreak_sandbox_plot", [trace_obs, trace_sim], {
-      title: "Outbreak Trajectory & Predictive Sandbox (I compartment)",
-      margin: { t: 40, b: 50, l: 60, r: 20 },
-      xaxis: { title: "Chronological Matrix (Day/Month)" },
-      yaxis: { title: "Active Case Volume" },
-      legend: { orientation: "h", y: -0.2 }
-    }, { responsive: true });
-  }
+        <!-- ROW 2: Biological Coefficients -->
+        <section class="card-row" aria-label="Biological Coefficients">
+            <h2 class="row-heading">Biological Coefficients</h2>
+            <div class="cards-grid" id="bioCoeffCards">
+                <!-- Populated by JS -->
+            </div>
+        </section>
 
-  // ---- Graph 2: S, I, R compartment dynamics ----------------------
-  function renderSIRPlot(beta, gamma, horizon) {
-    const sim = simulateSIR(beta, gamma, horizon);
-    const ext_dates = [...dateLabels];
-    // Pad the historical axis with placeholders so all three curves align
-    // on the same timeline. Only the future segment carries the SIR shape;
-    // we prepend the last observed points as the "now" anchor.
-    const future_dates = [];
-    for (let i = 0; i <= horizon; i++) future_dates.push("+d" + i);
+        <!-- ROW 3: Graphs (left) + Interactive Slider (right) -->
+        <section class="analysis-row">
+            <div class="charts-column" id="chartsColumn">
+                <!-- Charts injected by JS -->
+            </div>
 
-    const trace_S = { x: future_dates, y: sim.S, mode: "lines",
-      name: "S — Susceptible", line: { color: "#0078d4", width: 3 } };
-    const trace_I = { x: future_dates, y: sim.I, mode: "lines",
-      name: "I — Infected",     line: { color: "#d9534f", width: 3 } };
-    const trace_R = { x: future_dates, y: sim.R, mode: "lines",
-      name: "R — Recovered/Removed", line: { color: "#5cb85c", width: 3 } };
+            <aside class="slider-column" aria-label="Interactive Scenario Controls">
+                <h2 class="aside-heading">Interactive Scenario Controls</h2>
+                <p class="aside-desc">Adjust parameters to explore outbreak trajectories.</p>
 
-    Plotly.newPlot("sir_dynamics_plot", [trace_S, trace_I, trace_R], {
-      title: "SIR Compartment Dynamics — S / I / R Evolution",
-      margin: { t: 40, b: 50, l: 60, r: 20 },
-      xaxis: { title: "Days from Now (t = 0 is last observed)" },
-      yaxis: { title: "Population (persons)", type: "linear" },
-      legend: { orientation: "h", y: -0.2 },
-      hovermode: "x unified"
-    }, { responsive: true });
-  }
+                <div class="slider-group" id="sliderGroup">
+                    <!-- Populated by JS -->
+                </div>
 
-  // ---- Graph 3: Historical parameter trends -----------------------
-  function renderParameterTrends() {
-    const t_beta  = { x: dateLabels, y: beta_arr,  mode: "lines",
-      name: "Transmission Rate (beta_t)",
-      line: { color: "#f0ad4e", width: 2 } };
-    const t_gamma = { x: dateLabels, y: gamma_arr, mode: "lines",
-      name: "Recovery Rate (gamma_t)",
-      line: { color: "#5bc0de", width: 2 } };
-    const t_r0    = { x: dateLabels, y: r0_arr,    mode: "lines",
-      name: "Reproduction Number (R_t)",
-      line: { color: "#d9534f", width: 2.5, dash: "dash" } };
+                <button class="reset-btn" id="resetBtn">Reset to Defaults</button>
 
-    Plotly.newPlot("parameter_trends_plot", [t_beta, t_gamma, t_r0], {
-      title: "Biological Parameter Historical Trajectory Trends",
-      margin: { t: 40, b: 50, l: 60, r: 20 },
-      xaxis: { title: "Observation Interval Timeline" },
-      yaxis: { title: "Coefficient Scaling Matrix" },
-      legend: { orientation: "h", y: -0.2 }
-    }, { responsive: true });
-  }
+                <div class="zone-legend">
+                    <h3>Prediction Zones</h3>
+                    <ul>
+                        <li><span class="swatch swatch-retro"></span> Dark Grey — Animal-to-Human Transmission (Retrospective)</li>
+                        <li><span class="swatch swatch-data"></span> Light Grey — Observed Data</li>
+                        <li><span class="swatch swatch-future"></span> White — Future Prediction</li>
+                    </ul>
+                </div>
+            </aside>
+        </section>
 
-  // ---- Master render -----------------------------------------------
-  function renderAll() {
-    const beta    = parseFloat(document.getElementById("inputBeta").value);
-    const gamma   = parseFloat(document.getElementById("inputGamma").value);
-    const horizon = parseInt(document.getElementById("inputHorizon").value, 10);
+    </main>
 
-    document.getElementById("vBeta").innerText    = beta.toFixed(4);
-    document.getElementById("vGamma").innerText   = gamma.toFixed(4);
-    document.getElementById("vHorizon").innerText = horizon;
+    <footer class="portal-footer">
+        <span>© 2026 Ebola Outbreak Analysis Portal • Powered by Statistical Modelling</span>
+        <span>Data sources: WHO AfroGIS, RDHUB</span>
+    </footer>
 
-    // Live KPI refresh
-    document.getElementById("kpi_beta").innerText  = beta.toFixed(4);
-    document.getElementById("kpi_gamma").innerText = gamma.toFixed(4);
-    document.getElementById("kpi_r0").innerText    = (beta / gamma).toFixed(2);
-
-    renderOutbreak(beta, gamma, horizon);
-    renderSIRPlot(beta, gamma, horizon);
-    renderParameterTrends();
-  }
-
-  ["inputBeta", "inputGamma", "inputHorizon"].forEach(function(id) {
-    document.getElementById(id).addEventListener("input", renderAll);
-  });
-
-  renderAll();
-});
-</script>
+    <script src="js/main.js"></script>
 </body>
 </html>
