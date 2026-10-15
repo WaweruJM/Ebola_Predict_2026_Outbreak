@@ -80,7 +80,7 @@ jobs:
           head -1 downloaded_timeseries.csv | tr ',' '\n' | nl
           echo "=== TYPES (R) ==="
           Rscript -e 'x <- readr::read_csv("downloaded_timeseries.csv", show_col_types = FALSE); str(x); print(head(x, 3))'
-        run: Rscript incremental_fetch.R
+          Rscript incremental_fetch.R
 
       # ---------- Render R Markdown dashboard ----------
       - name: Render dashboard.Rmd
