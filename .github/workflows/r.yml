@@ -55,21 +55,38 @@ jobs:
             libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev \
             libtiff5-dev libjpeg-dev
 
-      # ---------- R packages (cached) ----------
+           # ---------- R package library (cached, deterministic) ----------
+      - name: Set up R library path
+        run: |
+          echo "R_LIBS_USER=$HOME/R/libs" >> $GITHUB_ENV
+          mkdir -p $HOME/R/libs
+
       - name: Cache R packages
         uses: actions/cache@v4
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: ${{ runner.os }}-r-${{ hashFiles('renv.lock', 'DESCRIPTION') }}
-          restore-keys: ${{ runner.os }}-r-
+          key: ${{ runner.os }}-r-4.4.3-${{ hashFiles('incremental_fetch.R', 'dashboard.Rmd') }}
+          restore-keys: |
+            ${{ runner.os }}-r-4.4.3-
 
       - name: Install R packages
         run: |
-          Rscript -e 'install.packages(c(
-            "httr", "jsonlite", "dplyr", "tidyr", "lubridate",
-            "deSolve", "ggplot2", "rmarkdown", "knitr",
-            "DT", "plotly", "scales", "forcats", "readr"
-          ), repos = "https://cloud.r-project.org")'
+          Rscript -e '
+            lib <- Sys.getenv("R_LIBS_USER")
+            .libPaths(c(lib, .libPaths()))
+            pkgs <- c(
+              "httr", "jsonlite", "dplyr", "tidyr", "lubridate",
+              "deSolve", "ggplot2", "rmarkdown", "knitr",
+              "DT", "plotly", "scales", "forcats", "readr"
+            )
+            need <- pkgs[!pkgs %in% rownames(installed.packages())]
+            if (length(need)) install.packages(need, lib = lib,
+                                               repos = "https://cloud.r-project.org")
+            ok <- pkgs %in% rownames(installed.packages())
+            cat("Installed:", paste(pkgs[ok], collapse=", "), "\n")
+            if (!all(ok)) stop("Missing packages: ",
+                               paste(pkgs[!ok], collapse=", "))
+          '
 
       # ---------- Run analysis + emit JSON ----------
       - name: Inspect downloaded CSV
@@ -82,12 +99,17 @@ jobs:
           Rscript -e 'x <- readr::read_csv("downloaded_timeseries.csv", show_col_types = FALSE); str(x); print(head(x, 3))'
           Rscript incremental_fetch.R
 
-      # ---------- Render R Markdown dashboard ----------
+           # ---------- Render R Markdown dashboard ----------
       - name: Render dashboard.Rmd
         run: |
           mkdir -p reports
-          Rscript -e 'rmarkdown::render("dashboard.Rmd",
-                       output_file = "reports/dashboard.html")'
+          Rscript -e '
+            .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
+            if (!requireNamespace("rmarkdown", quietly = TRUE))
+              stop("rmarkdown still not found — check install step logs")
+            rmarkdown::render("dashboard.Rmd",
+                              output_file = "reports/dashboard.html")
+          '
 
       # ---------- Assemble deployable site ----------
       - name: Assemble site
