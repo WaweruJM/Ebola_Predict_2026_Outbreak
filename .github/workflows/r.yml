@@ -55,7 +55,7 @@ jobs:
             libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev \
             libtiff5-dev libjpeg-dev
 
-           # ---------- R package library (cached, deterministic) ----------
+      # ---------- R package library (cached, deterministic) ----------
       - name: Set up R library path
         run: |
           echo "R_LIBS_USER=$HOME/R/libs" >> $GITHUB_ENV
@@ -69,25 +69,40 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-r-4.4.3-
 
-      - name: Install R packages
+           - name: Install R packages
         run: |
           Rscript -e '
             lib <- Sys.getenv("R_LIBS_USER")
+            dir.create(lib, recursive = TRUE, showWarnings = FALSE)
             .libPaths(c(lib, .libPaths()))
-            pkgs <- c(
-              "httr", "jsonlite", "dplyr", "tidyr", "lubridate",
-              "deSolve", "ggplot2", "rmarkdown", "knitr",
-              "DT", "plotly", "scales", "forcats", "readr"
-            )
-            need <- pkgs[!pkgs %in% rownames(installed.packages())]
-            if (length(need)) install.packages(need, lib = lib,
-                                               repos = "https://cloud.r-project.org")
-            ok <- pkgs %in% rownames(installed.packages())
-            cat("Installed:", paste(pkgs[ok], collapse=", "), "\n")
-            if (!all(ok)) stop("Missing packages: ",
-                               paste(pkgs[!ok], collapse=", "))
-          '
+            options(repos = c(CRAN = "https://cloud.r-project.org"),
+                    Ncpus = max(1, parallel::detectCores() - 1))
 
+            # Install in waves so dependency failures surface clearly.
+            waves <- list(
+              base = c("jsonlite", "readr", "tibble", "dplyr", "tidyr",
+                       "lubridate", "httr", "scales", "knitr"),
+              viz  = c("ggplot2", "htmlwidgets", "plotly", "DT"),
+              docs = c("rmarkdown")
+            )
+
+            for (wave in names(waves)) {
+              pkgs <- waves[[wave]]
+              need <- pkgs[!pkgs %in% rownames(installed.packages())]
+              if (length(need)) {
+                message("── Installing wave [", wave, "]: ",
+                        paste(need, collapse = ", "))
+                install.packages(need, lib = lib, dependencies = TRUE)
+              }
+            }
+
+            required <- unlist(waves, use.names = FALSE)
+            missing  <- required[!required %in% rownames(installed.packages())]
+            if (length(missing)) {
+              stop("Still missing: ", paste(missing, collapse = ", "))
+            }
+            cat("\n✔ All R packages available.\n")
+          '
       # ---------- Run analysis + emit JSON ----------
       - name: Inspect downloaded CSV
         run: |
