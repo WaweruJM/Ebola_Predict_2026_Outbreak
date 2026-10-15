@@ -1,113 +1,328 @@
 # =========================================================================
-# INCREMENTAL SELECTION ARCHITECTURE - FAIL-SAFE METRIC MATCHING
+# REGIONAL HEALTH DATA HUB: COMPILER & TEMPLATE INJECTION ENGINE
 # =========================================================================
-temp_download_path <- "downloaded_timeseries.csv"
-cache_filename <- "data_cache.csv"
-N <- 12500000 # Population constraint constant
+# Refactored, validated, and dependency-safe build script.
+# Produces: data_cache.csv (incremental) and index.html (dashboard).
+# =========================================================================
 
+# ---- Configuration ------------------------------------------------------
+temp_download_path <- "downloaded_timeseries.csv"
+cache_filename     <- "data_cache.csv"
+output_html        <- "index.html"
+N                  <- 12500000L
+PLOTLY_CDN         <- "https://cdn.plot.ly/plotly-2.27.0.min.js"
+GOOGLE_FONT        <- "https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+
+# ---- 1. Ingest & Validate Raw Data -------------------------------------
 if (!file.exists(temp_download_path)) {
-  stop("[CRITICAL ERROR] The data payload file was not found on local disk.")
+  stop("[CRITICAL ERROR] The data payload file was not found on local disk: ",
+       temp_download_path)
 }
 
-# Read data safely off the local virtual workspace
 remote_df <- read.csv(temp_download_path, stringsAsFactors = FALSE)
-col_names  <- colnames(remote_df)
+col_names <- colnames(remote_df)
 
-# --- DYNAMIC COLUMN HEADERS MATCHING ---
-# Find columns by matching patterns case-insensitively to avoid explicit spelling failures
-date_idx   <- grep("date", col_names, ignore.case = TRUE)[1]
-cases_idx  <- grep("confirm", col_names, ignore.case = TRUE)[1]
-deaths_idx <- grep("death", col_names, ignore.case = TRUE)[1]
-recov_idx  <- grep("recov", col_names, ignore.case = TRUE)[1]
+# Resolve columns by name; fall back to a position only if name is absent.
+pick_col <- function(name, fallback_pos) {
+  idx <- which(col_names == name)
+  if (length(idx) == 0) {
+    if (fallback_pos > length(col_names)) {
+      stop(sprintf("Column '%s' missing and fallback position %d out of range.",
+                   name, fallback_pos))
+    }
+    warning(sprintf("Column '%s' not found; using positional fallback #%d.",
+                    name, fallback_pos))
+    return(fallback_pos)
+  }
+  idx[1]
+}
 
-# If exact pattern matching fails, map to known index structures as fallbacks
-if(is.na(date_idx))   date_idx   <- 1
-if(is.na(cases_idx))  cases_idx  <- 2
-if(is.na(deaths_idx)) deaths_idx <- 3
-if(is.na(recov_idx))  recov_idx  <- 4
+date_idx   <- pick_col("report_date",              1)
+cases_idx  <- pick_col("confirmed_global",         3)
+deaths_idx <- pick_col("confirmed_deaths_global",  6)
+recov_idx  <- pick_col("recovered_global",         7)
 
-cat(sprintf("[PIPELINE DIAGNOSTIC] Mapping columns -> Date: %s | Cases: %s | Deaths: %s | Recovered: %s\n", 
-            col_names[date_idx], col_names[cases_idx], col_names[deaths_idx], col_names[recov_idx]))
+cat(sprintf(
+  "[PIPELINE DIAGNOSTIC] Mapping columns -> Date: %s | Cases: %s | Deaths: %s | Recovered: %s\n",
+  col_names[date_idx], col_names[cases_idx],
+  col_names[deaths_idx], col_names[recov_idx]
+))
 
-# Isolate standardized vectors safely without assignment mismatch risks
-report_date <- as.Date(remote_df[, date_idx])
-cases_vec   <- as.numeric(remote_df[, cases_idx])
-deaths_vec  <- as.numeric(remote_df[, deaths_idx])
-recov_vec   <- as.numeric(remote_df[, recov_idx])
+# ---- 2. Extract & Clean Vectors ----------------------------------------
+report_date_raw <- remote_df[[date_idx]]
+cases_vec       <- suppressWarnings(as.numeric(remote_df[[cases_idx]]))
+deaths_vec      <- suppressWarnings(as.numeric(remote_df[[deaths_idx]]))
+recov_vec       <- suppressWarnings(as.numeric(remote_df[[recov_idx]]))
 
-# Handle any structural parsing conversion anomalies safely
 cases_vec[is.na(cases_vec)]   <- 0
 deaths_vec[is.na(deaths_vec)] <- 0
 recov_vec[is.na(recov_vec)]   <- 0
 
-# --- COMPUTE DYNAMIC COMPARTMENTS ---
-# Safely assign processed arrays into a clean temporary data frame matrix
-processed_bridge <- data.frame(report_date = report_date)
+cumulative_infected  <- max(cases_vec,  na.rm = TRUE)
+cumulative_dead      <- max(deaths_vec, na.rm = TRUE)
+cumulative_recovered <- max(recov_vec,  na.rm = TRUE)
+
+processed_bridge <- data.frame(
+  report_date = as.Date(report_date_raw),
+  stringsAsFactors = FALSE
+)
 processed_bridge$R_obs <- deaths_vec + recov_vec
 processed_bridge$I_obs <- pmax(0, cases_vec - processed_bridge$R_obs)
 
 remote_processed <- na.omit(processed_bridge)
 remote_processed <- remote_processed[order(remote_processed$report_date), ]
+rownames(remote_processed) <- NULL
 
-# HELPER FUNCTION TO CALCULATE EPIDEMIOLOGICAL PARAMETERS ON THE FLY
+# ---- 3. Parameter Estimation -------------------------------------------
 compute_row_parameters <- function(df_matrix) {
-  total_rows <- nrow(df_matrix)
-  beta_vector  <- rep(0.25, total_rows)
-  gamma_vector <- rep(0.08, total_rows)
-  r0_vector    <- rep(3.12, total_rows)
-  perf_vector  <- rep(5.0, total_rows)
-  
-  if (total_rows < 7) return(data.frame(beta=beta_vector, gamma=gamma_vector, r0=r0_vector, perf_score=perf_vector))
-  
-  for (i in 7:total_rows) {
-    window <- df_matrix[(i-6):i, ]
-    g_val <- mean(diff(window$R_obs) / pmax(1, window$I_obs[-7]))
-    b_val <- mean((diff(window$I_obs) + diff(window$R_obs)) * N / (pmax(1, window$I_obs[-7]) * (N - window$I_obs[-7] - window$R_obs[-7])))
-    
-    gamma_vector[i] <- pmax(0.01, pmin(0.4, g_val))
-    beta_vector[i]  <- pmax(0.01, pmin(0.8, b_val))
+  n <- nrow(df_matrix)
+  beta_vector  <- rep(0.25, n)
+  gamma_vector <- rep(0.08, n)
+  r0_vector    <- rep(3.12, n)
+  perf_vector  <- rep(5.0,  n)
+
+  if (n < 7) {
+    return(data.frame(beta = beta_vector, gamma = gamma_vector,
+                      r0 = r0_vector, perf_score = perf_vector))
+  }
+
+  for (i in 7:n) {
+    window <- df_matrix[(i - 6):i, ]
+    denom_g <- pmax(1, window$I_obs[-7])
+    denom_b <- pmax(1, window$I_obs[-7]) *
+               pmax(1, N - window$I_obs[-7] - window$R_obs[-7])
+
+    g_val <- mean(diff(window$R_obs) / denom_g, na.rm = TRUE)
+    b_val <- mean((diff(window$I_obs) + diff(window$R_obs)) * N / denom_b,
+                  na.rm = TRUE)
+
+    gamma_vector[i] <- max(0.01, min(0.40, g_val))
+    beta_vector[i]  <- max(0.01, min(0.80, b_val))
     r0_vector[i]    <- beta_vector[i] / gamma_vector[i]
-    
+
     if (i > 14) {
-      past_observed <- df_matrix$I_obs[(i-6):i]
-      perf_vector[i] <- (mean(abs(past_observed - mean(past_observed))) / pmax(1, mean(past_observed))) * 100
+      past_observed  <- df_matrix$I_obs[(i - 6):i]
+      perf_vector[i] <- (mean(abs(past_observed - mean(past_observed))) /
+                         max(1, mean(past_observed))) * 100
     }
   }
-  beta_vector[1:6]  <- beta_vector; gamma_vector[1:6] <- gamma_vector; r0_vector[1:6] <- r0_vector
-  perf_vector[1:14] <- perf_vector
-  return(data.frame(beta = beta_vector, gamma = gamma_vector, r0 = r0_vector, perf_score = perf_vector))
+
+  data.frame(beta = beta_vector, gamma = gamma_vector,
+             r0 = r0_vector, perf_score = perf_vector)
 }
 
-# CONFIGURE PERSISTENT INTEGRATION LAYER SUB-SELECTION
+# ---- 4. Incremental Cache Logic ----------------------------------------
 if (file.exists(cache_filename)) {
-  local_cache <- read.csv(cache_filename)
+  local_cache <- read.csv(cache_filename, stringsAsFactors = FALSE)
   local_cache$report_date <- as.Date(local_cache$report_date)
-  
-  last_cached_date <- max(local_cache$report_date)
+  last_cached_date <- max(local_cache$report_date, na.rm = TRUE)
+
   new_entries <- subset(remote_processed, report_date > last_cached_date)
-  
+
   if (nrow(new_entries) > 0) {
-    cat(sprintf("[PIPELINE] Found %d net new data rows.\n", nrow(new_entries)))
-    starting_time_idx <- max(local_cache$time) + 1
-    new_entries$time <- starting_time_idx:(starting_time_idx + nrow(new_entries) - 1)
-    
-    combined_temp <- rbind(local_cache[, c("report_date", "I_obs", "R_obs", "time")], new_entries[, c("report_date", "I_obs", "R_obs", "time")])
+    starting_time_idx <- max(local_cache$time, na.rm = TRUE) + 1L
+    new_entries$time  <- seq.int(starting_time_idx,
+                                 length.out = nrow(new_entries))
+
+    combined_temp <- rbind(
+      local_cache[,  c("report_date", "I_obs", "R_obs", "time")],
+      new_entries[,  c("report_date", "I_obs", "R_obs", "time")]
+    )
     combined_temp <- combined_temp[order(combined_temp$report_date), ]
-    
+    rownames(combined_temp) <- NULL
+
     calculated_metrics <- compute_row_parameters(combined_temp)
-    combined_final <- cbind(combined_temp[, c("report_date", "time", "I_obs", "R_obs")], calculated_metrics)
-    write.csv(combined_final, cache_filename, row.names = FALSE)
+    clean_df <- cbind(
+      combined_temp[, c("report_date", "time", "I_obs", "R_obs")],
+      calculated_metrics
+    )
   } else {
-    cat("[PIPELINE] Cache database is already up to date.\n")
+    clean_df <- local_cache
   }
 } else {
-  cat("[PIPELINE INITIALIZATION] Provisioning fresh data schema structure...\n")
-  remote_processed$time <- 1:nrow(remote_processed)
-  calculated_metrics <- compute_row_parameters(remote_processed)
-  initial_payload <- cbind(remote_processed, calculated_metrics)
-  write.csv(initial_payload, cache_filename, row.names = FALSE)
+  remote_processed$time <- seq_len(nrow(remote_processed))
+  calculated_metrics    <- compute_row_parameters(remote_processed)
+  clean_df              <- cbind(remote_processed, calculated_metrics)
 }
 
-# Clean up temp file to keep repository workspace neat
-if(file.exists(temp_download_path)) { file.remove(temp_download_path) }
-cat("[SUCCESS] Data cache processed and written safely without dimensional alignment error exceptions.\n")
+write.csv(clean_df, cache_filename, row.names = FALSE)
+
+# ---- 5. Prepare JS Payloads --------------------------------------------
+current_beta  <- tail(clean_df$beta,  1)
+current_gamma <- tail(clean_df$gamma, 1)
+current_r0    <- tail(clean_df$r0,    1)
+
+# JSON-safe escaping helpers
+js_str_vec <- function(x) paste0('"', gsub('"', '\\"', x), '"', collapse = ",")
+js_num_vec <- function(x) paste(format(x, scientific = FALSE, trim = TRUE),
+                                collapse = ",")
+
+js_dates <- js_str_vec(format(clean_df$report_date, "%d %b"))
+js_I_obs <- js_num_vec(clean_df$I_obs)
+js_beta  <- js_num_vec(round(clean_df$beta,  4))
+js_gamma <- js_num_vec(round(clean_df$gamma, 4))
+js_r0    <- js_num_vec(round(clean_df$r0,    2))
+
+# ---- 6. Build HTML Template (fully closed, executable) -----------------
+h_lines <- c(
+'<!DOCTYPE html>',
+'<html lang="en">',
+'<head>',
+'  <meta charset="UTF-8">',
+'  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+'  <title>Regional Health Data Hub | WHO AFRO Mirror</title>',
+sprintf('  <link href="%s" rel="stylesheet">', GOOGLE_FONT),
+sprintf('  <script src="%s"></script>', PLOTLY_CDN),
+'  <style>',
+'    :root { --who-blue: #0078d4; --card-bg: #ffffff; --text-primary: #333333; }',
+'    body { font-family: "Roboto", sans-serif; margin: 0; padding: 0; background: #f4f6f9; color: var(--text-primary); }',
+'    header { background: var(--who-blue); color: #fff; padding: 15px 30px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }',
+'    header h1 { margin: 0; font-size: 22px; font-weight: 700; }',
+'    .branding { font-size: 12px; opacity: 0.85; text-transform: uppercase; font-weight: bold; }',
+'    .grid-container { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 25px; padding: 30px; max-width: 1600px; margin: 0 auto; }',
+'    .left-graphs-panel, .right-kpi-panel { display: flex; flex-direction: column; gap: 20px; }',
+'    .card { background: var(--card-bg); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e1e4e8; padding: 20px; }',
+'    .graph-card { min-height: 420px; }',
+'    .kpi-title { font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; margin-bottom: 5px; letter-spacing: 0.5px; }',
+'    .kpi-value { font-size: 32px; font-weight: 700; color: #111; line-height: 1; }',
+'    .kpi-value.danger { color: #d9534f; }',
+'    .kpi-value.success { color: #5cb85c; }',
+'    .kpi-value.warning { color: #f0ad4e; }',
+'    .kpi-value.info { color: #0275d8; }',
+'    .sandbox-controls { background: #eef2f7; padding: 15px; border-radius: 4px; margin-top: 10px; }',
+'    .slider-group { margin-bottom: 12px; }',
+'    .slider-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }',
+'    input[type=range] { width: 100%; }',
+'    .footer-banner { font-size: 11px; color: #777; text-align: center; padding: 15px; margin-top: 20px; border-top: 1px solid #ddd; }',
+'  </style>',
+'</head>',
+'<body>',
+'<header>',
+'  <div>',
+'    <h1>Ebola Disease Outbreak Analysis Portal</h1>',
+'    <div class="branding">WHO-AFRO Mirror Platform Alignment Matrix</div>',
+'  </div>',
+'  <div style="text-align: right; font-size: 12px;">Data Ingestion: <b>Live Incremental Cache</b></div>',
+'</header>',
+'<div class="grid-container">',
+'  <div class="left-graphs-panel">',
+'    <div class="card graph-card">',
+'      <div id="outbreak_sandbox_plot" style="width:100%; height:380px;"></div>',
+'    </div>',
+'    <div class="card graph-card">',
+'      <div id="parameter_trends_plot" style="width:100%; height:380px;"></div>',
+'    </div>',
+'  </div>',
+'  <div class="right-kpi-panel">',
+'    <div style="font-weight:bold; font-size:14px; border-left:4px solid #0078d4; padding-left:8px;">CUMULATIVE CASE TELEMETRY</div>',
+'    <div class="card"><div class="kpi-title">Total Laboratory Confirmed Cases</div>',
+sprintf('      <div class="kpi-value warning">%s</div></div>', format(cumulative_infected, big.mark=",")),
+'    <div class="card"><div class="kpi-title">Total Registered Recoveries</div>',
+sprintf('      <div class="kpi-value success">%s</div></div>', format(cumulative_recovered, big.mark=",")),
+'    <div class="card"><div class="kpi-title">Total Registered Fatalities</div>',
+sprintf('      <div class="kpi-value danger">%s</div></div>', format(cumulative_dead, big.mark=",")),
+'    <div style="font-weight:bold; font-size:14px; border-left:4px solid #0078d4; padding-left:8px; margin-top:15px;">CURRENT BIOLOGICAL COEFFICIENTS</div>',
+'    <div class="card"><div class="kpi-title">Effective Transmission Rate (beta)</div>',
+sprintf('      <div class="kpi-value info" id="kpi_beta">%s</div></div>', round(current_beta, 4)),
+'    <div class="card"><div class="kpi-title">Clinical Recovery Rate (gamma)</div>',
+sprintf('      <div class="kpi-value success" id="kpi_gamma">%s</div></div>', round(current_gamma, 4)),
+'    <div class="card"><div class="kpi-title">Effective Reproduction Number (R_t)</div>',
+sprintf('      <div class="kpi-value danger" id="kpi_r0">%s</div></div>', round(current_r0, 2)),
+'    <div class="card">',
+'      <div class="kpi-title">Epidemiological Forecasting Sandbox</div>',
+'      <div class="sandbox-controls">',
+'        <div class="slider-group">',
+'          <label>Transmission Rate (beta): <span id="vBeta">', round(current_beta, 4), '</span></label>',
+'          <input type="range" id="inputBeta" min="0.01" max="0.8" step="0.01" value="', round(current_beta, 2), '">',
+'        </div>',
+'        <div class="slider-group">',
+'          <label>Recovery Rate (gamma): <span id="vGamma">', round(current_gamma, 4), '</span></label>',
+'          <input type="range" id="inputGamma" min="0.01" max="0.4" step="0.01" value="', round(current_gamma, 2), '">',
+'        </div>',
+'      </div>',
+'    </div>',
+'  </div>',
+'</div>',
+'<div class="footer-banner">',
+'  Ref. data.afro.who.int Mirror Alignment Map. Continuous tracking calculated serverless daily via localized structural R environments.',
+'</div>',
+'<script>',
+'document.addEventListener("DOMContentLoaded", function() {',
+sprintf('  const dateLabels = [%s];', js_dates),
+sprintf('  const obs_I = [%s];',      js_I_obs),
+sprintf('  const beta_arr = [%s];',   js_beta),
+sprintf('  const gamma_arr = [%s];',  js_gamma),
+sprintf('  const r0_arr = [%s];',     js_r0),
+sprintf('  const N = %d;',            as.integer(N)),
+'',
+'  function generateForecast(beta, gamma) {',
+'    let current_I = obs_I[obs_I.length - 1];',
+'    let current_S = N - current_I;',
+'    let sim_I = [...obs_I];',
+'    for (let t = 0; t < 14; t++) {',
+'      let dS = -(beta * current_S * current_I) / N;',
+'      let dI = (beta * current_S * current_I) / N - (gamma * current_I);',
+'      current_S += dS;',
+'      current_I += dI;',
+'      sim_I.push(current_I);',
+'    }',
+'    return sim_I;',
+'  }',
+'',
+'  function renderPlots() {',
+'    const beta  = parseFloat(document.getElementById("inputBeta").value);',
+'    const gamma = parseFloat(document.getElementById("inputGamma").value);',
+'    document.getElementById("vBeta").innerText  = beta.toFixed(4);',
+'    document.getElementById("vGamma").innerText = gamma.toFixed(4);',
+'',
+'    const sim_I = generateForecast(beta, gamma);',
+'    const ext_dates = [...dateLabels];',
+'    for (let i = 1; i <= 14; i++) ext_dates.push("+d" + i);',
+'',
+'    const trace_obs = { x: dateLabels, y: obs_I, mode: "markers",',
+'      name: "Observed Active Cases", marker: { color: "#333", size: 6 } };',
+'    const trace_sim = { x: ext_dates, y: sim_I, mode: "lines",',
+'      name: "Dynamic Model Path (14d Forecast)",',
+'      line: { color: "#cc0000", width: 3 } };',
+'    Plotly.newPlot("outbreak_sandbox_plot", [trace_obs, trace_sim], {',
+'      title: "Outbreak Trajectory & Predictive Sandbox",',
+'      margin: { t: 40, b: 50, l: 60, r: 20 },',
+'      xaxis: { title: "Chronological Matrix (Day/Month)" },',
+'      yaxis: { title: "Active Case Volume" },',
+'      legend: { orientation: "h", y: -0.2 }',
+'    });',
+'',
+'    const t_beta  = { x: dateLabels, y: beta_arr,  mode: "lines",',
+'      name: "Transmission Rate (beta_t)",',
+'      line: { color: "#f0ad4e", width: 2 } };',
+'    const t_gamma = { x: dateLabels, y: gamma_arr, mode: "lines",',
+'      name: "Recovery Rate (gamma_t)",',
+'      line: { color: "#5bc0de", width: 2 } };',
+'    const t_r0    = { x: dateLabels, y: r0_arr,    mode: "lines",',
+'      name: "Reproduction Number (R_t)",',
+'      line: { color: "#d9534f", width: 2.5, dash: "dash" } };',
+'    Plotly.newPlot("parameter_trends_plot", [t_beta, t_gamma, t_r0], {',
+'      title: "Biological Parameter Historical Trajectory Trends",',
+'      margin: { t: 40, b: 50, l: 60, r: 20 },',
+'      xaxis: { title: "Observation Interval Timeline" },',
+'      yaxis: { title: "Coefficient Scaling Matrix" },',
+'      legend: { orientation: "h", y: -0.2 }',
+'    });',
+'  }',
+'',
+'  document.getElementById("inputBeta").addEventListener("input", renderPlots);',
+'  document.getElementById("inputGamma").addEventListener("input", renderPlots);',
+'  renderPlots();',
+'});',
+'</script>',
+'</body>',
+'</html>'
+)
+
+html_content <- paste(h_lines, collapse = "\n")
+writeLines(html_content, output_html, useBytes = TRUE)
+
+if (file.exists(temp_download_path)) file.remove(temp_download_path)
+
+cat(sprintf("[SUCCESS] Compilation engine wrote '%s' and updated '%s'.\n",
+            output_html, cache_filename))
