@@ -1,8 +1,15 @@
 # =========================================================================
 # REGIONAL HEALTH DATA HUB: COMPILER & TEMPLATE INJECTION ENGINE
 # =========================================================================
-# Refactored, validated, and dependency-safe build script.
+# Refactored build script.
 # Produces: data_cache.csv (incremental) and index.html (dashboard).
+#
+# LEFT PANEL (3 stacked graphs):
+#   1. outbreak_sandbox_plot  -> Observed + 14-day forecast (I compartment)
+#   2. parameter_trends_plot  -> beta_t, gamma_t, R_t historical
+#   3. sir_dynamics_plot      -> S, I, R compartment curves (live, slider-driven)
+#
+# RIGHT PANEL: KPIs + beta/gamma sandbox sliders.
 # =========================================================================
 
 # ---- Configuration ------------------------------------------------------
@@ -22,7 +29,6 @@ if (!file.exists(temp_download_path)) {
 remote_df <- read.csv(temp_download_path, stringsAsFactors = FALSE)
 col_names <- colnames(remote_df)
 
-# Resolve columns by name; fall back to a position only if name is absent.
 pick_col <- function(name, fallback_pos) {
   idx <- which(col_names == name)
   if (length(idx) == 0) {
@@ -152,18 +158,18 @@ current_beta  <- tail(clean_df$beta,  1)
 current_gamma <- tail(clean_df$gamma, 1)
 current_r0    <- tail(clean_df$r0,    1)
 
-# JSON-safe escaping helpers
 js_str_vec <- function(x) paste0('"', gsub('"', '\\"', x), '"', collapse = ",")
 js_num_vec <- function(x) paste(format(x, scientific = FALSE, trim = TRUE),
                                 collapse = ",")
 
 js_dates <- js_str_vec(format(clean_df$report_date, "%d %b"))
 js_I_obs <- js_num_vec(clean_df$I_obs)
+js_R_obs <- js_num_vec(clean_df$R_obs)
 js_beta  <- js_num_vec(round(clean_df$beta,  4))
 js_gamma <- js_num_vec(round(clean_df$gamma, 4))
 js_r0    <- js_num_vec(round(clean_df$r0,    2))
 
-# ---- 6. Build HTML Template (fully closed, executable) -----------------
+# ---- 6. Build HTML Template --------------------------------------------
 h_lines <- c(
 '<!DOCTYPE html>',
 '<html lang="en">',
@@ -194,6 +200,7 @@ sprintf('  <script src="%s"></script>', PLOTLY_CDN),
 '    .slider-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }',
 '    input[type=range] { width: 100%; }',
 '    .footer-banner { font-size: 11px; color: #777; text-align: center; padding: 15px; margin-top: 20px; border-top: 1px solid #ddd; }',
+'    @media (max-width: 1100px) { .grid-container { grid-template-columns: 1fr; } }',
 '  </style>',
 '</head>',
 '<body>',
@@ -208,6 +215,9 @@ sprintf('  <script src="%s"></script>', PLOTLY_CDN),
 '  <div class="left-graphs-panel">',
 '    <div class="card graph-card">',
 '      <div id="outbreak_sandbox_plot" style="width:100%; height:380px;"></div>',
+'    </div>',
+'    <div class="card graph-card">',
+'      <div id="sir_dynamics_plot" style="width:100%; height:380px;"></div>',
 '    </div>',
 '    <div class="card graph-card">',
 '      <div id="parameter_trends_plot" style="width:100%; height:380px;"></div>',
@@ -239,6 +249,10 @@ sprintf('      <div class="kpi-value danger" id="kpi_r0">%s</div></div>', round(
 '          <label>Recovery Rate (gamma): <span id="vGamma">', round(current_gamma, 4), '</span></label>',
 '          <input type="range" id="inputGamma" min="0.01" max="0.4" step="0.01" value="', round(current_gamma, 2), '">',
 '        </div>',
+'        <div class="slider-group" style="margin-top:8px; font-size:11px; color:#555;">',
+'          <label>Forecast Horizon (days): <span id="vHorizon">60</span></label>',
+'          <input type="range" id="inputHorizon" min="14" max="180" step="1" value="60">',
+'        </div>',
 '      </div>',
 '    </div>',
 '  </div>',
@@ -250,48 +264,82 @@ sprintf('      <div class="kpi-value danger" id="kpi_r0">%s</div></div>', round(
 'document.addEventListener("DOMContentLoaded", function() {',
 sprintf('  const dateLabels = [%s];', js_dates),
 sprintf('  const obs_I = [%s];',      js_I_obs),
+sprintf('  const obs_R = [%s];',      js_R_obs),
 sprintf('  const beta_arr = [%s];',   js_beta),
 sprintf('  const gamma_arr = [%s];',  js_gamma),
 sprintf('  const r0_arr = [%s];',     js_r0),
 sprintf('  const N = %d;',            as.integer(N)),
 '',
-'  function generateForecast(beta, gamma) {',
-'    let current_I = obs_I[obs_I.length - 1];',
-'    let current_S = N - current_I;',
-'    let sim_I = [...obs_I];',
-'    for (let t = 0; t < 14; t++) {',
-'      let dS = -(beta * current_S * current_I) / N;',
-'      let dI = (beta * current_S * current_I) / N - (gamma * current_I);',
-'      current_S += dS;',
-'      current_I += dI;',
-'      sim_I.push(current_I);',
+'  // ---- Core SIR integrator (Euler, dt = 1 day) --------------------',
+'  function simulateSIR(beta, gamma, horizon) {',
+'    const last_I = obs_I[obs_I.length - 1];',
+'    const last_R = obs_R[obs_R.length - 1];',
+'    let S = Math.max(0, N - last_I - last_R);',
+'    let I = last_I;',
+'    let R = last_R;',
+'    const S_arr = [S], I_arr = [I], R_arr = [R];',
+'    for (let t = 0; t < horizon; t++) {',
+'      const dS = -(beta * S * I) / N;',
+'      const dI =  (beta * S * I) / N - gamma * I;',
+'      const dR =  gamma * I;',
+'      S = Math.max(0, S + dS);',
+'      I = Math.max(0, I + dI);',
+'      R = Math.max(0, R + dR);',
+'      S_arr.push(S); I_arr.push(I); R_arr.push(R);',
 '    }',
-'    return sim_I;',
+'    return { S: S_arr, I: I_arr, R: R_arr };',
 '  }',
 '',
-'  function renderPlots() {',
-'    const beta  = parseFloat(document.getElementById("inputBeta").value);',
-'    const gamma = parseFloat(document.getElementById("inputGamma").value);',
-'    document.getElementById("vBeta").innerText  = beta.toFixed(4);',
-'    document.getElementById("vGamma").innerText = gamma.toFixed(4);',
-'',
-'    const sim_I = generateForecast(beta, gamma);',
+'  // ---- Graph 1: Observed + short forecast -------------------------',
+'  function renderOutbreak(beta, gamma, horizon) {',
+'    const sim = simulateSIR(beta, gamma, Math.min(horizon, 30));',
 '    const ext_dates = [...dateLabels];',
-'    for (let i = 1; i <= 14; i++) ext_dates.push("+d" + i);',
+'    for (let i = 1; i < sim.I.length; i++) ext_dates.push("+d" + i);',
 '',
 '    const trace_obs = { x: dateLabels, y: obs_I, mode: "markers",',
 '      name: "Observed Active Cases", marker: { color: "#333", size: 6 } };',
-'    const trace_sim = { x: ext_dates, y: sim_I, mode: "lines",',
-'      name: "Dynamic Model Path (14d Forecast)",',
+'    const trace_sim = { x: ext_dates, y: sim.I, mode: "lines",',
+'      name: "Model Path (short horizon)",',
 '      line: { color: "#cc0000", width: 3 } };',
+'',
 '    Plotly.newPlot("outbreak_sandbox_plot", [trace_obs, trace_sim], {',
-'      title: "Outbreak Trajectory & Predictive Sandbox",',
+'      title: "Outbreak Trajectory & Predictive Sandbox (I compartment)",',
 '      margin: { t: 40, b: 50, l: 60, r: 20 },',
 '      xaxis: { title: "Chronological Matrix (Day/Month)" },',
 '      yaxis: { title: "Active Case Volume" },',
 '      legend: { orientation: "h", y: -0.2 }',
-'    });',
+'    }, { responsive: true });',
+'  }',
 '',
+'  // ---- Graph 2: S, I, R compartment dynamics ----------------------',
+'  function renderSIRPlot(beta, gamma, horizon) {',
+'    const sim = simulateSIR(beta, gamma, horizon);',
+'    const ext_dates = [...dateLabels];',
+'    // Pad the historical axis with placeholders so all three curves align',
+'    // on the same timeline. Only the future segment carries the SIR shape;',
+'    // we prepend the last observed points as the "now" anchor.',
+'    const future_dates = [];',
+'    for (let i = 0; i <= horizon; i++) future_dates.push("+d" + i);',
+'',
+'    const trace_S = { x: future_dates, y: sim.S, mode: "lines",',
+'      name: "S — Susceptible", line: { color: "#0078d4", width: 3 } };',
+'    const trace_I = { x: future_dates, y: sim.I, mode: "lines",',
+'      name: "I — Infected",     line: { color: "#d9534f", width: 3 } };',
+'    const trace_R = { x: future_dates, y: sim.R, mode: "lines",',
+'      name: "R — Recovered/Removed", line: { color: "#5cb85c", width: 3 } };',
+'',
+'    Plotly.newPlot("sir_dynamics_plot", [trace_S, trace_I, trace_R], {',
+'      title: "SIR Compartment Dynamics — S / I / R Evolution",',
+'      margin: { t: 40, b: 50, l: 60, r: 20 },',
+'      xaxis: { title: "Days from Now (t = 0 is last observed)" },',
+'      yaxis: { title: "Population (persons)", type: "linear" },',
+'      legend: { orientation: "h", y: -0.2 },',
+'      hovermode: "x unified"',
+'    }, { responsive: true });',
+'  }',
+'',
+'  // ---- Graph 3: Historical parameter trends -----------------------',
+'  function renderParameterTrends() {',
 '    const t_beta  = { x: dateLabels, y: beta_arr,  mode: "lines",',
 '      name: "Transmission Rate (beta_t)",',
 '      line: { color: "#f0ad4e", width: 2 } };',
@@ -301,18 +349,41 @@ sprintf('  const N = %d;',            as.integer(N)),
 '    const t_r0    = { x: dateLabels, y: r0_arr,    mode: "lines",',
 '      name: "Reproduction Number (R_t)",',
 '      line: { color: "#d9534f", width: 2.5, dash: "dash" } };',
+'',
 '    Plotly.newPlot("parameter_trends_plot", [t_beta, t_gamma, t_r0], {',
 '      title: "Biological Parameter Historical Trajectory Trends",',
 '      margin: { t: 40, b: 50, l: 60, r: 20 },',
 '      xaxis: { title: "Observation Interval Timeline" },',
 '      yaxis: { title: "Coefficient Scaling Matrix" },',
 '      legend: { orientation: "h", y: -0.2 }',
-'    });',
+'    }, { responsive: true });',
 '  }',
 '',
-'  document.getElementById("inputBeta").addEventListener("input", renderPlots);',
-'  document.getElementById("inputGamma").addEventListener("input", renderPlots);',
-'  renderPlots();',
+'  // ---- Master render -----------------------------------------------',
+'  function renderAll() {',
+'    const beta    = parseFloat(document.getElementById("inputBeta").value);',
+'    const gamma   = parseFloat(document.getElementById("inputGamma").value);',
+'    const horizon = parseInt(document.getElementById("inputHorizon").value, 10);',
+'',
+'    document.getElementById("vBeta").innerText    = beta.toFixed(4);',
+'    document.getElementById("vGamma").innerText   = gamma.toFixed(4);',
+'    document.getElementById("vHorizon").innerText = horizon;',
+'',
+'    // Live KPI refresh',
+'    document.getElementById("kpi_beta").innerText  = beta.toFixed(4);',
+'    document.getElementById("kpi_gamma").innerText = gamma.toFixed(4);',
+'    document.getElementById("kpi_r0").innerText    = (beta / gamma).toFixed(2);',
+'',
+'    renderOutbreak(beta, gamma, horizon);',
+'    renderSIRPlot(beta, gamma, horizon);',
+'    renderParameterTrends();',
+'  }',
+'',
+'  ["inputBeta", "inputGamma", "inputHorizon"].forEach(function(id) {',
+'    document.getElementById(id).addEventListener("input", renderAll);',
+'  });',
+'',
+'  renderAll();',
 '});',
 '</script>',
 '</body>',
