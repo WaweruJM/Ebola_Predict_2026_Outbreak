@@ -1,0 +1,182 @@
+{
+  "generated_at": "2026-10-15T20:13:24Z",
+  "case_telemetry": [
+    {
+      "label": "Confirmed Cases",
+      "value": 9167,
+      "unit": "",
+      "delta": "+79 today",
+      "trend": "up"
+    },
+    {
+      "label": "Suspected Cases",
+      "value": 116,
+      "unit": "",
+      "delta": "+0 today",
+      "trend": ""
+    },
+    {
+      "label": "Total Cases",
+      "value": 9283,
+      "unit": "",
+      "delta": "+79 today",
+      "trend": "up"
+    },
+    {
+      "label": "Total Deaths",
+      "value": 4413,
+      "unit": "",
+      "delta": "+29 today",
+      "trend": "up"
+    },
+    {
+      "label": "Recovered",
+      "value": 2437,
+      "unit": "",
+      "delta": "+29 today",
+      "trend": "up"
+    },
+    {
+      "label": "Active Cases",
+      "value": 2433,
+      "unit": "",
+      "delta": "+21 today",
+      "trend": "up"
+    },
+    {
+      "label": "Case Fatality Rate",
+      "value": 47.5,
+      "unit": "%",
+      "delta": "-0.0929533234804154 today (pts)",
+      "trend": "down"
+    },
+    {
+      "label": "Observation Days",
+      "value": 150,
+      "unit": "",
+      "delta": "since 2026-05-15",
+      "trend": ""
+    }
+  ],
+  "bio_coefficients": [
+    {
+      "label": "R0 (Basic Reproduction)",
+      "value": 0.25,
+      "unit": "",
+      "delta": "Early-phase estimate"
+    },
+    {
+      "label": "Rt (Effective Repro.)",
+      "value": 0.87,
+      "unit": "",
+      "delta": "Latest 7-day window"
+    },
+    {
+      "label": "Incubation Period",
+      "value": 9.4,
+      "unit": "d",
+      "delta": "Mean, IQR 7–12 d"
+    },
+    {
+      "label": "Infectious Period",
+      "value": 7.8,
+      "unit": "d",
+      "delta": "Mean, IQR 5–10 d"
+    },
+    {
+      "label": "Serial Interval",
+      "value": 12.1,
+      "unit": "d",
+      "delta": "Mean, SD 4.3 d"
+    },
+    {
+      "label": "CFR (Modelled)",
+      "value": 47.54,
+      "unit": "%",
+      "delta": "Confirmed + suspected deaths"
+    },
+    {
+      "label": "Doubling Time",
+      "value": -8.3,
+      "unit": "d",
+      "delta": "Early-phase regression"
+    },
+    {
+      "label": "Generation Time",
+      "value": 15.3,
+      "unit": "d",
+      "delta": "Mean estimate"
+    }
+  ],
+  "chart_series": {
+    "months": ["2026-05-17", "2026-05-20", "2026-05-23", "2026-05-26", "2026-05-29", "2026-06-01", "2026-06-04", "2026-06-07", "2026-06-10", "2026-06-13", "2026-06-16", "2026-06-19", "2026-06-22", "2026-06-25", "2026-06-29", "2026-07-02", "2026-07-05", "2026-07-08", "2026-07-11", "2026-07-14", "2026-07-17", "2026-07-20", "2026-07-23", "2026-07-26", "2026-07-29", "2026-08-01", "2026-08-04", "2026-08-07", "2026-08-10", "2026-08-13", "2026-08-16", "2026-08-19", "2026-08-22", "2026-08-25", "2026-08-28", "2026-08-31", "2026-09-03", "2026-09-06", "2026-09-09", "2026-09-12", "2026-09-15", "2026-09-18", "2026-09-21", "2026-09-24", "2026-09-27", "2026-09-30", "2026-10-03", "2026-10-07", "2026-10-10", "2026-10-13"],
+    "reported_cases": [349, 651, 838, 1018, 1040, 446, 513, 685, 770, 845, 972, 1068, 1184, 1292, 1444, 1597, 1761, 1896, 2010, 2210, 2318, 2560, 3042, 3399, 3579, 3811, 4011, 4257, 4518, 4802, 5082, 5345, 5595, 5793, 6000, 6237, 6479, 6741, 6980, 7250, 7482, 7678, 7870, 8027, 8204, 8361, 8579, 8866, 9052, 9283],
+    "projected_cases": ["NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA"],
+    "deaths": [88, 140, 178, 234, 241, 49, 65, 103, 129, 151, 198, 247, 269, 306, 379, 454, 523, 602, 674, 798, 866, 969, 1271, 1439, 1523, 1623, 1753, 1889, 2013, 2186, 2327, 2478, 2608, 2717, 2826, 2952, 3074, 3177, 3312, 3439, 3547, 3641, 3734, 3801, 3903, 3984, 4082, 4208, 4318, 4413],
+    "rt": ["NA", "NA", "NA", "NA", 0.3622, 0.0481, 0.3269, 10.8636, 9.5161, 0.9559, 0.8505, 0.7922, 0.9341, 1.1864, 1.0788, 1.3959, 0.898, 1.1278, 1.0615, 0.9733, 1.0701, 1.3569, 2.3524, 2.4094, 2.199, 0.7413, 0.5795, 0.8149, 1.0722, 1.1747, 1.1923, 1.0826, 0.97, 0.8399, 0.7531, 0.9165, 1.0873, 1.0683, 1.1043, 1.0243, 1.0298, 0.8857, 0.8304, 0.7786, 0.8369, 0.9712, 1.208, 1.402, 1.2535, 0.8727],
+    "rt_lower": "NA",
+    "rt_upper": "NA",
+    "zoonotic_events": ["NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA"],
+    "cumulative_confirmed": [349, 651, 838, 1018, 1040, 1040, 1107, 1279, 1364, 1439, 1566, 1662, 1778, 1886, 2038, 2191, 2355, 2490, 2604, 2804, 2912, 3154, 3636, 3993, 4173, 4405, 4605, 4851, 5112, 5396, 5676, 5939, 6189, 6387, 6594, 6831, 7073, 7335, 7574, 7844, 8076, 8272, 8464, 8621, 8798, 8955, 9173, 9460, 9646, 9877],
+    "cumulative_projected": ["NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA", "NA"]
+  },
+  "zones": [
+    {
+      "from": 0,
+      "to": 7,
+      "label": "Animal-to-Human (Retrospective)"
+    },
+    {
+      "from": 7,
+      "to": 49,
+      "label": "Observed Data"
+    },
+    {
+      "from": 49,
+      "to": 49,
+      "label": "Future Prediction"
+    }
+  ],
+  "sliders": [
+    {
+      "id": "beta",
+      "label": "Transmission Rate (β)",
+      "min": 0.1,
+      "max": 1,
+      "step": 0.01,
+      "value": 0.42
+    },
+    {
+      "id": "gamma",
+      "label": "Recovery Rate (γ)",
+      "min": 0.05,
+      "max": 0.5,
+      "step": 0.01,
+      "value": 0.13
+    },
+    {
+      "id": "mu",
+      "label": "Mortality Rate (μ)",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "value": 0.68
+    },
+    {
+      "id": "zoonotic",
+      "label": "Zoonotic Spillover",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "value": 12
+    },
+    {
+      "id": "interv",
+      "label": "Intervention Efficacy",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "value": 35
+    }
+  ]
+}
