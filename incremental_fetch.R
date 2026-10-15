@@ -12,16 +12,27 @@ if (!file.exists(temp_download_path)) {
 remote_df  <- read.csv(temp_download_path, stringsAsFactors = FALSE)
 col_names  <- colnames(remote_df)
 
-# Dynamic Column Headers Extraction Alignment Matrix
-date_idx   <- grep("date", col_names, ignore.case = TRUE)
-cases_idx  <- grep("confirm", col_names, ignore.case = TRUE)
-deaths_idx <- grep("death", col_names, ignore.case = TRUE)
-recov_idx  <- grep("recov", col_names, ignore.case = TRUE)
+# --- EXACT COLUMN HEADERS EXTRACATION ALIGNMENT ---
+# Matching precise string names found in webbegole/ebola-bundibugyo-tracker-2026
+date_idx   <- which(col_names == "report_date")
+cases_idx  <- which(col_names == "confirmed_global")
+deaths_idx <- which(col_names == "confirmed_deaths_global")
+recov_idx  <- which(col_names == "recovered_global")
 
-if(is.na(date_idx))   date_idx   <- 1
-if(is.na(cases_idx))  cases_idx  <- 2
-if(is.na(deaths_idx)) deaths_idx <- 3
-if(is.na(recov_idx))  recov_idx  <- 4
+# Structural fallback verification block
+if(length(date_idx) == 0)   date_idx   <- 1
+if(length(cases_idx) == 0)  cases_idx  <- 3  # Column index position mapping
+if(length(deaths_idx) == 0) deaths_idx <- 6
+if(length(recov_idx) == 0)  recov_idx  <- 7
+
+# Ensure we only pick the first element if multiple match by accident
+date_idx   <- date_idx[1]
+cases_idx  <- cases_idx[1]
+deaths_idx <- deaths_idx[1]
+recov_idx  <- recov_idx[1]
+
+cat(sprintf("[PIPELINE DIAGNOSTIC] Mapping columns -> Date: %s | Cases: %s | Deaths: %s | Recovered: %s\n", 
+            col_names[date_idx], col_names[cases_idx], col_names[deaths_idx], col_names[recov_idx]))
 
 # Extract vectors
 report_date_raw <- remote_df[, date_idx]
@@ -70,8 +81,8 @@ compute_row_parameters <- function(df_matrix) {
       perf_vector[i] <- (mean(abs(past_observed - mean(past_observed))) / pmax(1, mean(past_observed))) * 100
     }
   }
-  beta_vector[1:6]  <- beta_vector[7]; gamma_vector[1:6] <- gamma_vector[7]; r0_vector[1:6] <- r0_vector[7]
-  perf_vector[1:14] <- perf_vector[15]
+  beta_vector[1:6]  <- beta_vector; gamma_vector[1:6] <- gamma_vector; r0_vector[1:6] <- r0_vector
+  perf_vector[1:14] <- perf_vector
   return(data.frame(beta = beta_vector, gamma = gamma_vector, r0 = r0_vector, perf_score = perf_vector))
 }
 
@@ -128,8 +139,8 @@ html_content <- paste0('<!DOCTYPE html>
         header { background-color: var(--who-blue); color: white; padding: 15px 30px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
         .branding { font-size: 12px; opacity: 0.85; text-transform: uppercase; font-weight: bold; }
-        .grid-container { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 25px; padding: 30px; max-width: 1600px; margin: 0 auto; height: calc(100vh - 100px); }
-        .left-graphs-panel { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding-right: 5px; }
+        .grid-container { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 25px; padding: 30px; max-width: 1600px; margin: 0 auto; }
+        .left-graphs-panel { display: flex; flex-direction: column; gap: 20px; }
         .right-kpi-panel { display: flex; flex-direction: column; gap: 15px; }
         .card { background: var(--card-bg); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e1e4e8; padding: 20px; }
         .graph-card { min-height: 420px; }
@@ -169,7 +180,6 @@ html_content <- paste0('<!DOCTYPE html>
 
     <!-- RIGHT PANEL: VERTICAL KPI & CUMULATIVE VALUE BLOCKS -->
     <div class="right-kpi-panel">
-        <!-- Cumulative Section Headers -->
         <div style="font-weight: bold; font-size: 14px; border-left: 4px solid var(--who-blue); padding-left: 8px; margin-bottom: 5px;">CUMULATIVE CASE TELEMETRY</div>
         
         <div class="card">
@@ -188,21 +198,8 @@ html_content <- paste0('<!DOCTYPE html>
         <div style="font-weight: bold; font-size: 14px; border-left: 4px solid var(--who-blue); padding-left: 8px; margin-top: 15px; margin-bottom: 5px;">CURRENT BIOLOGICAL COEFFICIENTS</div>
 
         <div class="card">
-            <div class="kpi-title">Effective Transmission Rate (β)</div>
+            <div class="kpi-title">Effective Transmission Rate (beta)</div>
             <div class="kpi-value info" id="kpi_beta">', round(current_beta, 4), '</div>
         </div>
         <div class="card">
-            <div class="kpi-title">Clinical Recovery Rate (γ)</div>
-            <div class="kpi-value success" id="kpi_gamma">', round(current_gamma, 4), '</div>
-        </div>
-        <div class="card">
-            <div class="kpi-title">Effective Reproduction Number (R_t)</div>
-            <div class="kpi-value danger" id="kpi_r0">', round(current_r0, 2), '</div>
-        </div>
-
-        <!-- Interactive Sandbox Panel -->
-        <div class="card" style="border-top: 3px solid var(--who-blue);">
-
-# Clean up temp file to keep repository workspace neat
-if(file.exists(temp_download_path)) { file.remove(temp_download_path) }
-cat("[SUCCESS] Data cache processed and written safely without dimensional alignment error exceptions.\n")
+            <div class="kpi-title">Clinical Recovery Rate (gamma)</div>
