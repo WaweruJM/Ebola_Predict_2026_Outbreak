@@ -72,7 +72,14 @@ jobs:
           ), repos = "https://cloud.r-project.org")'
 
       # ---------- Run analysis + emit JSON ----------
-      - name: Run incremental fetch and export JSON
+      - name: Inspect downloaded CSV
+        run: |
+          echo "=== HEAD ==="
+          head -5 downloaded_timeseries.csv
+          echo "=== COLUMNS ==="
+          head -1 downloaded_timeseries.csv | tr ',' '\n' | nl
+          echo "=== TYPES (R) ==="
+          Rscript -e 'x <- readr::read_csv("downloaded_timeseries.csv", show_col_types = FALSE); str(x); print(head(x, 3))'
         run: Rscript incremental_fetch.R
 
       # ---------- Render R Markdown dashboard ----------
