@@ -212,8 +212,12 @@ message(sprintf("  OVERALL RMSE=%.1f  MAE=%.1f  R²=%.3f",
 message("STEP 7 — 14-day projection + JSON export")
 
 proj_times <- seq(full_days, full_days + PROJECTION_DAYS, by = 1)
-proj_state <- as.numeric(tail(sir_full, 1)[, -1])
-sir_proj   <- as.data.frame(
+# Preserve names so deSolve can bind S, I, R, D inside sir_model()
+last_row   <- tail(sir_full, 1)
+proj_state <- setNames(
+  as.numeric(last_row[, c("S", "I", "R", "D")]),
+  c("S", "I", "R", "D")
+)sir_proj   <- as.data.frame(
   ode(y = proj_state, times = proj_times, func = sir_model, parms = params)
 )
 
