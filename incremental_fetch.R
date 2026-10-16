@@ -207,10 +207,18 @@ message(sprintf("  OVERALL RMSE=%.1f  MAE=%.1f  R²=%.3f",
                 overall$rmse, overall$mae, overall$r2))
 
 # ============================================================
+# ============================================================
 # STEP 7 — PROJECTION (14 days) + EXPORT JSON
 # ============================================================
 message("STEP 7 — 14-day projection + JSON export")
 
+# Time index for the projection window: from the last observed day
+# forward PROJECTION_DAYS days, inclusive.
+proj_times <- seq(full_days, full_days + PROJECTION_DAYS, by = 1)
+
+# Initial state for the projection = last compartment values from the
+# full-run fit. `setNames()` preserves the S/I/R/D names that
+# `as.numeric()` strips, so deSolve can bind them inside sir_model().
 last_row   <- tail(sir_full, 1)
 proj_state <- setNames(
   as.numeric(last_row[, c("S", "I", "R", "D")]),
