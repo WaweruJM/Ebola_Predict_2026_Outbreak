@@ -31,7 +31,7 @@ This report is generated automatically by the daily **Ebola Analytics
 Pipeline**. It shares its data, parameters, prediction zones, and
 coefficients with the interactive portal at the repository root.
 
-The workflow below follows a stepwise SIR modelling cycle:
+The workflow follows a stepwise SIR modelling cycle:
 
 1. Data preparation
 2. Data wrangling
@@ -41,8 +41,8 @@ The workflow below follows a stepwise SIR modelling cycle:
 6. Model performance analysis
 7. Projection (14 days)
 
-The population at risk is fixed at **`r format(N_total, big.mark = ",")`** persons,
-consistent with the portal.
+The population at risk is fixed at 20,000,000 persons, consistent with
+the portal.
 
 # STEP 1 — Data Preparation
 
@@ -63,7 +63,7 @@ knitr::kable(
 
 cat("\nClean rows:", nrow(outbreak_df),
     "  Range:", as.character(min(outbreak_df$date)),
-    "→", as.character(max(outbreak_df$date)), "\n")
+    "to", as.character(max(outbreak_df$date)), "\n")
 ```
 
 # STEP 3 — Primary Parameters Computed from Raw Data
@@ -72,13 +72,13 @@ cat("\nClean rows:", nrow(outbreak_df),
 param_table <- data.frame(
   Parameter = c(
     "Population at risk (N)",
-    "Initial susceptible (S₀)",
-    "Initial infectious (I₀)",
+    "Initial susceptible (S0)",
+    "Initial infectious (I0)",
     "Growth rate (r)",
-    "Recovery rate (γ)",
-    "Mortality rate (μ)",
-    "Transmission rate (β = r + γ + μ)",
-    "Basic reproduction number (R₀ = β / (γ + μ))"
+    "Recovery rate (gamma)",
+    "Mortality rate (mu)",
+    "Transmission rate (beta = r + gamma + mu)",
+    "Basic reproduction number (R0 = beta / (gamma + mu))"
   ),
   Value = c(
     format(N_total, big.mark = ","),
@@ -96,14 +96,18 @@ knitr::kable(param_table, caption = "Primary parameters derived from raw observa
 
 **Key calculations**
 
-- Growth rate: log-linear regression on the first 30 % of the **daily
-  incidence** series, using the model ``log(I(t)) = a + r·t``.
-- Recovery rate: ``γ = 1 / 10 days`` (mean infectious period).
-- Mortality rate: ``μ = (CFR / 100) / infectious period``, giving a
-  **daily** hazard out of the I compartment.
-- Transmission rate: closed-form from the SIR early-phase identity
-  ``r = β − γ − μ``, so ``β = r + γ + μ``.
-- Basic reproduction number: ``R₀ = β / (γ + μ)``.
+- **Growth rate (r):** log-linear regression on the first 30 % of the
+  daily incidence series using the model log I(t) equals a plus r times t.
+- **Recovery rate (gamma):** gamma equals one divided by ten days, from
+  the mean infectious period.
+- **Mortality rate (mu):** mu equals (CFR divided by 100) divided by the
+  infectious period, giving a daily hazard out of the infectious
+  compartment.
+- **Transmission rate (beta):** closed-form from the SIR early-phase
+  identity r equals beta minus gamma minus mu, so beta equals r plus
+  gamma plus mu.
+- **Basic reproduction number (R0):** R0 equals beta divided by
+  (gamma plus mu).
 
 # STEP 4 — Model Generation (Training Set)
 
@@ -142,47 +146,43 @@ knitr::kable(perf_tbl, caption = "SIR model performance metrics")
 
 cat("\nInterpretation notes:\n")
 cat("- RMSE and MAE are in units of cumulative cases.\n")
-cat("- R² closer to 1 indicates better explanatory power.\n")
-cat("- Negative R² indicates the model performs worse than the mean.\n")
+cat("- R-squared closer to 1 indicates better explanatory power.\n")
+cat("- Negative R-squared indicates the model performs worse than the mean.\n")
 ```
 
-# SIR Compartments with β, γ, μ Reference Lines
+# SIR Compartments with beta, gamma, mu Reference Lines
 
 ```{r sir-compartments, fig.height=6}
 sir_long <- sir_full %>%
   select(time, S, I, R, D) %>%
   pivot_longer(-time, names_to = "compartment", values_to = "value")
 
-# Scale parameters to the I compartment for visual reference
-# (they are daily rates, so we plot them on a separate scale — here
-# we annotate them as horizontal dotted lines with right-edge labels).
+# Scale parameter rates for visual overlay on the compartment plot
+scale_factor <- max(sir_long$value, na.rm = TRUE) /
+                max(c(beta_est, gamma_est, mu_est), na.rm = TRUE) * 0.35
+
 param_lines <- data.frame(
-  rate  = c(beta_est, gamma_est, mu_est),
-  label = c(sprintf("β = %.3f", beta_est),
-            sprintf("γ = %.3f", gamma_est),
-            sprintf("μ = %.3f", mu_est)),
+  rate  = c(beta_est, gamma_est, mu_est) * scale_factor,
+  label = c(sprintf("beta = %.3f",  beta_est),
+            sprintf("gamma = %.3f", gamma_est),
+            sprintf("mu = %.3f",    mu_est)),
   col   = c("#c0392b", "#27ae60", "#8e44ad")
 )
 
-# For the plot, we draw the compartment curves on the left axis and
-# the parameter values as scaled dotted lines so they remain visible.
-scale_factor <- max(sir_long$value, na.rm = TRUE) /
-                max(param_lines$rate, na.rm = TRUE) * 0.35
-
 ggplot(sir_long, aes(x = time, y = value, colour = compartment)) +
   geom_line(linewidth = 1.1) +
-  geom_hline(yintercept = param_lines$rate * scale_factor,
+  geom_hline(yintercept = param_lines$rate,
              linetype = "dotted", colour = param_lines$col,
              linewidth = 0.8) +
   annotate("text",
            x = max(sir_long$time) * 0.98,
-           y = param_lines$rate * scale_factor,
+           y = param_lines$rate,
            label = param_lines$label,
            hjust = 1, vjust = -0.4,
            colour = param_lines$col, size = 3.3, fontface = "bold") +
   labs(x = "Days since first report",
        y = "Individuals (compartments) / scaled rates (dotted)",
-       title = "SIR compartments with β, γ, μ reference lines",
+       title = "SIR compartments with beta, gamma, mu reference lines",
        colour = "Compartment") +
   theme_minimal(base_size = 12) +
   theme(legend.position = "right")
