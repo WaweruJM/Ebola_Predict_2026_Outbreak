@@ -2,7 +2,7 @@ name: Ebola Analytics Pipeline
 
 on:
   schedule:
-    - cron: '0 5 * * *'        # daily at 05:00 UTC
+    - cron: '0 5 * * *'
   workflow_dispatch:
 
 permissions:
@@ -22,11 +22,9 @@ jobs:
       R_LIBS_USER: ${{ github.workspace }}/.Rlib
 
     steps:
-      # ---------------- Checkout ----------------
       - name: Checkout workspace
         uses: actions/checkout@v4
 
-      # ---------------- Fetch upstream tracker ----------------
       - name: Fetch upstream tracker data
         uses: actions/checkout@v4
         with:
@@ -41,7 +39,6 @@ jobs:
           ls -la downloaded_timeseries.csv
           head -3 downloaded_timeseries.csv
 
-      # ---------------- R + Pandoc ----------------
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
@@ -51,37 +48,18 @@ jobs:
       - name: Setup Pandoc
         uses: r-lib/actions/setup-pandoc@v2
 
-      # ---------------- System libraries ----------------
-      # Required by htmlwidgets (V8), rmarkdown, sass, systemfonts,
-      # textshaping and git2r. Missing these caused cascading
-      # "non-zero exit status" failures in earlier runs.
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libcurl4-openssl-dev \
-            libssl-dev \
-            libxml2-dev \
-            libfontconfig1-dev \
-            libharfbuzz-dev \
-            libfribidi-dev \
-            libfreetype6-dev \
-            libpng-dev \
-            libtiff5-dev \
-            libjpeg-dev \
-            libgit2-dev \
-            libprotobuf-dev \
-            protobuf-compiler \
-            libv8-dev \
-            libnode-dev \
-            libsodium-dev
+            libcurl4-openssl-dev libssl-dev libxml2-dev \
+            libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
+            libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
 
-      # ---------------- R library cache ----------------
       - name: Prepare R library directory
         run: |
           mkdir -p "$R_LIBS_USER"
           echo "R_LIBS_USER=$R_LIBS_USER" >> $GITHUB_ENV
-          Rscript -e 'cat("Using library:", Sys.getenv("R_LIBS_USER"), "\n")'
 
       - name: Cache R packages
         uses: actions/cache@v4
@@ -91,56 +69,23 @@ jobs:
           restore-keys: |
             r-4.4.3-${{ runner.os }}-
 
-      # ---------------- R packages ----------------
-      # Installed in waves (base → viz → docs). deSolve is in the base
-      # wave so it is available before incremental_fetch.R runs.
       - name: Install R packages
         run: |
           Rscript -e '
             lib <- Sys.getenv("R_LIBS_USER")
             dir.create(lib, recursive = TRUE, showWarnings = FALSE)
             .libPaths(c(lib, .libPaths()))
-            options(
-              repos = c(CRAN = "https://cloud.r-project.org"),
-              Ncpus = max(1L, parallel::detectCores() - 1L)
-            )
-
-            waves <- list(
-              base = c("jsonlite", "readr", "tibble", "dplyr", "tidyr",
-                       "lubridate", "httr", "scales", "knitr", "deSolve"),
-              viz  = c("ggplot2", "htmlwidgets", "DT"),
-              docs = c("rmarkdown")
-            )
-
-            for (wave in names(waves)) {
-              pkgs <- waves[[wave]]
-              need <- pkgs[!pkgs %in% rownames(installed.packages())]
-              if (length(need)) {
-                message("── Wave [", wave, "]: installing ",
-                        paste(need, collapse = ", "))
-                install.packages(need, lib = lib, dependencies = TRUE)
-              } else {
-                message("── Wave [", wave, "]: already installed")
-              }
-            }
-
-            # plotly is best-effort — the Rmd falls back to ggplot2 if absent.
-            if (!"plotly" %in% rownames(installed.packages())) {
-              try(install.packages("plotly", lib = lib), silent = TRUE)
-            }
-
-            required <- unlist(waves, use.names = FALSE)
-            missing  <- required[!required %in% rownames(installed.packages())]
-            if (length(missing)) {
-              stop("Still missing: ", paste(missing, collapse = ", "))
-            }
-            cat("\n✔ All required R packages available.\n")
-            cat("Optional plotly:",
-                if ("plotly" %in% rownames(installed.packages())) "yes" else "no",
-                "\n")
+            options(repos = c(CRAN = "https://cloud.r-project.org"),
+                    Ncpus = max(1L, parallel::detectCores() - 1L))
+            pkgs <- c("jsonlite","readr","tibble","dplyr","tidyr",
+                      "lubridate","ggplot2","knitr","rmarkdown","deSolve")
+            need <- pkgs[!pkgs %in% rownames(installed.packages())]
+            if (length(need)) install.packages(need, lib = lib, dependencies = TRUE)
+            missing <- pkgs[!pkgs %in% rownames(installed.packages())]
+            if (length(missing)) stop("Missing: ", paste(missing, collapse=", "))
+            cat("All required R packages available.\n")
           '
 
-      # ---------------- Analysis + JSON export ----------------
       - name: Run incremental fetch and export JSON
         run: |
           Rscript -e '
@@ -151,24 +96,19 @@ jobs:
       - name: Verify JSON output
         run: |
           ls -la data/
-          head -20 data/ebola_data.json
+          head -10 data/ebola_data.json
 
-      # ---------------- Render Rmd dashboard ----------------
       - name: Render dashboard.Rmd
         run: |
           mkdir -p reports
           Rscript -e '
             .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            stopifnot(requireNamespace("rmarkdown", quietly = TRUE))
-            rmarkdown::render(
-              "dashboard.Rmd",
-              output_file = "reports/dashboard.html",
-              quiet = FALSE
-            )
+            rmarkdown::render("dashboard.Rmd",
+                              output_file = "reports/dashboard.html",
+                              quiet = FALSE)
           '
           ls -la reports/
 
-      # ---------------- Assemble deployable site ----------------
       - name: Assemble site
         run: |
           mkdir -p _site
@@ -178,8 +118,7 @@ jobs:
           cp -r data       _site/
           cp -r reports    _site/
           touch _site/.nojekyll
-          echo "── Deployable tree ──"
-          find _site -maxdepth 2 -type f | sort | head -60
+          find _site -maxdepth 2 -type f | sort | head -40
 
       - name: Upload site artifact
         uses: actions/upload-artifact@v4
@@ -187,7 +126,6 @@ jobs:
           name: ebola-portal-site
           path: _site/
 
-      # ---------------- Publish to gh-pages ----------------
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
