@@ -9,95 +9,129 @@ output:
     theme: flatly
     toc: true
     toc_float: true
+    toc_depth: 3
     code_folding: show
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
-                      fig.width = 11, fig.height = 5, dpi = 110)
+knitr::opts_chunk$set(
+  echo = TRUE, warning = FALSE, message = FALSE,
+  fig.width = 11, fig.height = 5, dpi = 110
+)
 source("incremental_fetch.R")
-library(ggplot2); library(dplyr); library(tidyr); library(deSolve)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(deSolve)
 ```
+
+# Overview
+
+This report is generated automatically by the daily **Ebola Analytics
+Pipeline**. It shares its data, parameters, prediction zones, and
+coefficients with the interactive portal at the repository root.
+
+The workflow below follows a stepwise SIR modelling cycle:
+
+1. Data preparation
+2. Data wrangling
+3. Computation of primary parameters from the raw data
+4. Model generation (training)
+5. Model testing (holdout)
+6. Model performance analysis
+7. Projection (14 days)
+
+The population at risk is fixed at **`r format(N_total, big.mark = ",")`** persons,
+consistent with the portal.
 
 # STEP 1 — Data Preparation
 
-```{r}
+```{r step1}
 knitr::kable(head(raw, 5), caption = "Raw upstream series (head)")
 cat("\nRows:", nrow(raw), " Columns:", ncol(raw), "\n")
+cat("Columns:", paste(names(raw), collapse = ", "), "\n")
 ```
 
 # STEP 2 — Data Wrangling
 
-```{r}
-knitr::kable(head(outbreak_df, 5),
-             caption = "Cleaned series with derived active cases and CFR")
+```{r step2}
+knitr::kable(
+  head(outbreak_df[, c("date","suspected","confirmed","total",
+                       "deaths","recovered","active_cases","cfr")], 8),
+  caption = "Cleaned series with derived active cases and CFR"
+)
+
+cat("\nClean rows:", nrow(outbreak_df),
+    "  Range:", as.character(min(outbreak_df$date)),
+    "→", as.character(max(outbreak_df$date)), "\n")
 ```
 
 # STEP 3 — Primary Parameters Computed from Raw Data
 
-```{r}
+```{r step3}
 param_table <- data.frame(
-  Parameter = c("Population at risk (N)",
-                "Growth rate (r)",
-                "Recovery rate (γ)",
-                "Mortality rate (μ)",
-                "Transmission rate (β = r + γ + μ)",
-                "Basic reproduction number (R₀ = β / (γ + μ))"),
-  Value     = c(format(N_total, big.mark = ","),
-                sprintf("%.4f /day", growth_rate),
-                sprintf("%.4f /day", gamma_est),
-                sprintf("%.4f /day", mu_est),
-                sprintf("%.4f /day", beta_est),
-                sprintf("%.3f",       R0_est))
+  Parameter = c(
+    "Population at risk (N)",
+    "Initial susceptible (S₀)",
+    "Initial infectious (I₀)",
+    "Growth rate (r)",
+    "Recovery rate (γ)",
+    "Mortality rate (μ)",
+    "Transmission rate (β = r + γ + μ)",
+    "Basic reproduction number (R₀ = β / (γ + μ))"
+  ),
+  Value = c(
+    format(N_total, big.mark = ","),
+    format(round(S0), big.mark = ","),
+    format(round(I0), big.mark = ","),
+    sprintf("%.4f /day", growth_rate),
+    sprintf("%.4f /day", gamma_est),
+    sprintf("%.4f /day", mu_est),
+    sprintf("%.4f /day", beta_est),
+    sprintf("%.3f",       R0_est)
+  )
 )
-knitr::kable(param_table, caption = "Primary parameters from raw observations")
+knitr::kable(param_table, caption = "Primary parameters derived from raw observations")
 ```
 
 **Key calculations**
 
-- Growth rate: log-linear regression on the first 30 % of the cumulative
-  case series, `log(I(t)) ~ a + r·t`.
-- Recovery rate: `γ = 1 / 10 days`.
-- Mortality rate: `μ = CFR / 100` using the latest observed CFR.
+- Growth rate: log-linear regression on the first 30 % of the **daily
+  incidence** series, using the model ``log(I(t)) = a + r·t``.
+- Recovery rate: ``γ = 1 / 10 days`` (mean infectious period).
+- Mortality rate: ``μ = (CFR / 100) / infectious period``, giving a
+  **daily** hazard out of the I compartment.
 - Transmission rate: closed-form from the SIR early-phase identity
-  `r = β − γ − μ`.
-- Reproduction number: `R₀ = β / (γ + μ)`.
+  ``r = β − γ − μ``, so ``β = r + γ + μ``.
+- Basic reproduction number: ``R₀ = β / (γ + μ)``.
 
-# STEP 4 — Model Generation (Training)
+# STEP 4 — Model Generation (Training Set)
 
-```{r}
-# SIR with mortality (deSolve)
-sir_model <- function(time, state, parms) {
-  with(as.list(c(state, parms)), {
-    N  <- S + I + R + D
-    dS <- -beta * S * I / N
-    dI <-  beta * S * I / N - (gamma + mu) * I
-    dR <-  gamma * I
-    dD <-  mu * I
-    list(c(dS, dI, dR, dD))
-  })
-}
-
-train_df <- as.data.frame(sir_train)
-knitr::kable(head(train_df, 5),
-             caption = "Trained SIR compartments — first 5 days")
+```{r step4}
+knitr::kable(
+  head(as.data.frame(sir_train), 6),
+  caption = "Trained SIR compartments — first six days"
+)
+cat("\nTraining window:", train_n, "days  (",
+    sprintf("%.0f%%", TRAIN_FRACTION * 100), "of observations)\n")
 ```
 
-# STEP 5 — Model Testing (Holdout)
+# STEP 5 — Model Testing (Holdout Set)
 
-```{r}
+```{r step5}
 test_df <- data.frame(
-  Day        = full_times[test_mask],
-  Observed   = observed_I[test_mask],
-  Predicted  = round(predicted_I[test_mask], 0),
-  Residual   = round(observed_I[test_mask] - predicted_I[test_mask], 0)
+  Day       = full_times[test_mask],
+  Observed  = observed_I[test_mask],
+  Predicted = round(predicted_I[test_mask], 0),
+  Residual  = round(observed_I[test_mask] - predicted_I[test_mask], 0)
 )
 knitr::kable(test_df, caption = "Holdout window — observed vs predicted")
+cat("\nHoldout window:", test_n, "days\n")
 ```
 
 # STEP 6 — Model Performance
 
-```{r}
+```{r step6}
 perf_tbl <- data.frame(
   Window  = c("Train", "Test", "Overall"),
   RMSE    = round(c(train_perf$rmse, test_perf$rmse, overall$rmse), 2),
@@ -105,6 +139,11 @@ perf_tbl <- data.frame(
   R2      = round(c(train_perf$r2,   test_perf$r2,   overall$r2),   3)
 )
 knitr::kable(perf_tbl, caption = "SIR model performance metrics")
+
+cat("\nInterpretation notes:\n")
+cat("- RMSE and MAE are in units of cumulative cases.\n")
+cat("- R² closer to 1 indicates better explanatory power.\n")
+cat("- Negative R² indicates the model performs worse than the mean.\n")
 ```
 
 # SIR Compartments with β, γ, μ Reference Lines
@@ -114,20 +153,35 @@ sir_long <- sir_full %>%
   select(time, S, I, R, D) %>%
   pivot_longer(-time, names_to = "compartment", values_to = "value")
 
+# Scale parameters to the I compartment for visual reference
+# (they are daily rates, so we plot them on a separate scale — here
+# we annotate them as horizontal dotted lines with right-edge labels).
+param_lines <- data.frame(
+  rate  = c(beta_est, gamma_est, mu_est),
+  label = c(sprintf("β = %.3f", beta_est),
+            sprintf("γ = %.3f", gamma_est),
+            sprintf("μ = %.3f", mu_est)),
+  col   = c("#c0392b", "#27ae60", "#8e44ad")
+)
+
+# For the plot, we draw the compartment curves on the left axis and
+# the parameter values as scaled dotted lines so they remain visible.
+scale_factor <- max(sir_long$value, na.rm = TRUE) /
+                max(param_lines$rate, na.rm = TRUE) * 0.35
+
 ggplot(sir_long, aes(x = time, y = value, colour = compartment)) +
   geom_line(linewidth = 1.1) +
-  geom_hline(yintercept = 0, linetype = "dotted") +
-  annotate("text", x = max(sir_long$time), y = beta_est,
-           label = sprintf("β = %.3f", beta_est),  hjust = 1, colour = "#c0392b") +
-  annotate("text", x = max(sir_long$time), y = gamma_est,
-           label = sprintf("γ = %.3f", gamma_est), hjust = 1, colour = "#27ae60") +
-  annotate("text", x = max(sir_long$time), y = mu_est,
-           label = sprintf("μ = %.3f", mu_est),    hjust = 1, colour = "#8e44ad") +
-  geom_hline(yintercept = c(beta_est, gamma_est, mu_est),
-             linetype = "dotted",
-             colour  = c("#c0392b", "#27ae60", "#8e44ad"),
-             linewidth = 0.7) +
-  labs(x = "Days since first report", y = "Individuals",
+  geom_hline(yintercept = param_lines$rate * scale_factor,
+             linetype = "dotted", colour = param_lines$col,
+             linewidth = 0.8) +
+  annotate("text",
+           x = max(sir_long$time) * 0.98,
+           y = param_lines$rate * scale_factor,
+           label = param_lines$label,
+           hjust = 1, vjust = -0.4,
+           colour = param_lines$col, size = 3.3, fontface = "bold") +
+  labs(x = "Days since first report",
+       y = "Individuals (compartments) / scaled rates (dotted)",
        title = "SIR compartments with β, γ, μ reference lines",
        colour = "Compartment") +
   theme_minimal(base_size = 12) +
@@ -138,17 +192,36 @@ ggplot(sir_long, aes(x = time, y = value, colour = compartment)) +
 
 ```{r projection}
 proj_df <- as.data.frame(sir_proj)
-knitr::kable(head(proj_df, 14),
+knitr::kable(head(proj_df, 15),
              caption = "14-day SIR projection (next two weeks)")
+```
+
+```{r projection-plot, fig.height=5}
+proj_long <- proj_df %>%
+  select(time, S, I, R, D) %>%
+  pivot_longer(-time, names_to = "compartment", values_to = "value")
+
+ggplot(proj_long, aes(x = time, y = value, colour = compartment)) +
+  geom_line(linewidth = 1.2) +
+  labs(x = "Days since first report",
+       y = "Individuals",
+       title = "Projection of SIR compartments over the next 14 days",
+       colour = "Compartment") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
 ```
 
 # Downloadable Data
 
 ```{r download}
-DT::datatable(outbreak_df, extensions = "Buttons",
-  options = list(dom = "Bfrtip",
-                 buttons = c("csv", "excel"),
-                 pageLength = 8),
-  rownames = FALSE)
+DT::datatable(
+  outbreak_df,
+  extensions = "Buttons",
+  options = list(
+    dom = "Bfrtip",
+    buttons = c("csv", "excel"),
+    pageLength = 8
+  ),
+  rownames = FALSE
+)
 ```
-
