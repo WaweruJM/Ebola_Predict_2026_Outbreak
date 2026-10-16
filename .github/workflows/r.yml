@@ -52,9 +52,9 @@ jobs:
         uses: r-lib/actions/setup-pandoc@v2
 
       # ---------------- System libraries ----------------
-      # These are what htmlwidgets (→ DT, plotly), rmarkdown, sass,
-      # systemfonts and V8 actually need to compile. Missing them caused
-      # the "non-zero exit status" cascade in earlier runs.
+      # Required by htmlwidgets (V8), rmarkdown, sass, systemfonts,
+      # textshaping and git2r. Missing these caused cascading
+      # "non-zero exit status" failures in earlier runs.
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -92,8 +92,8 @@ jobs:
             r-4.4.3-${{ runner.os }}-
 
       # ---------------- R packages ----------------
-      # Installed in waves so each tier is complete before the next
-      # (base → visualization → docs). Every package is verified at the end.
+      # Installed in waves (base → viz → docs). deSolve is in the base
+      # wave so it is available before incremental_fetch.R runs.
       - name: Install R packages
         run: |
           Rscript -e '
@@ -107,7 +107,7 @@ jobs:
 
             waves <- list(
               base = c("jsonlite", "readr", "tibble", "dplyr", "tidyr",
-                       "lubridate", "httr", "scales", "knitr"),
+                       "lubridate", "httr", "scales", "knitr", "deSolve"),
               viz  = c("ggplot2", "htmlwidgets", "DT"),
               docs = c("rmarkdown")
             )
