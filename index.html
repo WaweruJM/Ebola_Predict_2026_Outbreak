@@ -5,16 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ebola Disease Outbreak Analysis Portal 2026</title>
     <link rel="stylesheet" href="css/style.css">
-    <!-- Chart.js for graphs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-
-    <!-- ============================================
-         TOP MARQUEE BANNER (right-to-left)
-         ============================================ -->
     <div class="top-marquee">
         <div class="marquee-track">
             <span class="marquee-text">
@@ -26,84 +20,55 @@
         </div>
     </div>
 
-    <!-- ============================================
-         FIXED HEADER with centered title + virus
-         ============================================ -->
     <header class="portal-header">
         <div class="header-inner">
-            <div class="virus-icon left-virus" aria-hidden="true">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Ebola_virus_%28Ebola_virus%29.jpg/240px-Ebola_virus_%28Ebola_virus%29.jpg"
-                     alt="Ebola virus" onerror="this.style.display='none'; this.parentElement.textContent='🦠';">
-            </div>
+            <div class="virus-icon left-virus" aria-hidden="true">🦠</div>
             <div class="header-title-block">
                 <h1 class="portal-title">Ebola Disease Outbreak Analysis Portal</h1>
                 <div class="live-indicator">
-                    <span class="blink-dot" aria-hidden="true"></span>
+                    <span class="blink-dot"></span>
                     <span class="live-text">Daily Updated Data Analysis</span>
                 </div>
             </div>
-            <div class="virus-icon right-virus" aria-hidden="true">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Ebola_virus_%28Ebola_virus%29.jpg/240px-Ebola_virus_%28Ebola_virus%29.jpg"
-                     alt="Ebola virus" onerror="this.style.display='none'; this.parentElement.textContent='🦠';">
-            </div>
+            <div class="virus-icon right-virus" aria-hidden="true">🦠</div>
         </div>
     </header>
 
-    <!-- ============================================
-         MAIN CONTENT
-         ============================================ -->
     <main class="portal-main">
-
-        <!-- ROW 1: Cumulative Case Telemetry -->
-        <section class="card-row" aria-label="Cumulative Case Telemetry">
+        <section class="card-row">
             <h2 class="row-heading">Cumulative Case Telemetry</h2>
-            <div class="cards-grid" id="caseTelemetryCards">
-                <!-- Populated by JS -->
-            </div>
+            <div class="cards-grid" id="caseTelemetryCards"></div>
         </section>
 
-        <!-- ROW 2: Biological Coefficients -->
-        <section class="card-row" aria-label="Biological Coefficients">
+        <section class="card-row">
             <h2 class="row-heading">Biological Coefficients</h2>
-            <div class="cards-grid" id="bioCoeffCards">
-                <!-- Populated by JS -->
-            </div>
+            <div class="cards-grid" id="bioCoeffCards"></div>
         </section>
 
-        <!-- ROW 3: Graphs (left) + Interactive Slider (right) -->
         <section class="analysis-row">
-            <div class="charts-column" id="chartsColumn">
-                <!-- Charts injected by JS -->
-            </div>
-
-            <aside class="slider-column" aria-label="Interactive Scenario Controls">
+            <div class="charts-column" id="chartsColumn"></div>
+            <aside class="slider-column">
                 <h2 class="aside-heading">Interactive Scenario Controls</h2>
                 <p class="aside-desc">Adjust parameters to explore outbreak trajectories.</p>
-
-                <div class="slider-group" id="sliderGroup">
-                    <!-- Populated by JS -->
-                </div>
-
+                <div class="slider-group" id="sliderGroup"></div>
                 <button class="reset-btn" id="resetBtn">Reset to Defaults</button>
-
                 <div class="zone-legend">
                     <h3>Prediction Zones</h3>
                     <ul>
-                        <li><span class="swatch swatch-retro"></span> Dark Grey — Animal-to-Human Transmission (Retrospective)</li>
+                        <li><span class="swatch swatch-retro"></span> Dark Grey — Animal-to-Human (Retrospective)</li>
                         <li><span class="swatch swatch-data"></span> Light Grey — Observed Data</li>
                         <li><span class="swatch swatch-future"></span> White — Future Prediction</li>
                     </ul>
                 </div>
             </aside>
         </section>
-
     </main>
 
     <footer class="portal-footer">
-        <span>© 2026 Ebola Outbreak Analysis Portal • Powered by Statistical Modelling</span>
+        <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
         <span>Data sources: WHO AfroGIS, RDHUB</span>
     </footer>
 
-    <script src="js/main.js"></script>
+    <script src="js/main.js" defer></script>
 </body>
 </html>
