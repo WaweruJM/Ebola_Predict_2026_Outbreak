@@ -211,4 +211,3 @@ proj_tbl <- as.data.frame(sir_proj) %>%
 
 knitr::kable(head(proj_tbl, 15),
              caption = "SIR compartments over the next two weeks")
-text
