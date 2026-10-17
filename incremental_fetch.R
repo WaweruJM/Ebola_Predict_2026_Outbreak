@@ -163,4 +163,97 @@ case_telemetry <- list(
        unit = "", delta = fmt_delta(latest$active_cases, previous$active_cases),
        trend = trend_of(latest$active_cases, previous$active_cases)),
   list(label = "Case Fatality Rate",  value = round(latest$cfr, 1),
-       unit = "%", delta = fmt_delta(latest$cfr
+       unit = "%", delta = fmt_delta(latest$cfr, previous$cfr, "pts"),
+       trend = trend_of(latest$cfr, previous$cfr))
+)
+
+bio_coefficients <- list(
+  list(label = "beta (Transmission Rate)", value = round(beta_est, 4),
+       unit = "/day", delta = "beta = r + gamma + mu"),
+  list(label = "gamma (Recovery Rate)",    value = round(gamma_est, 4),
+       unit = "/day", delta = "gamma = 1 / 10 days"),
+  list(label = "mu (Mortality Rate)",      value = round(mu_est, 4),
+       unit = "/day", delta = "mu = (CFR / 100) / 10"),
+  list(label = "R0 (Basic Reproduction)",  value = round(R0_est, 3),
+       unit = "", delta = "R0 = beta / (gamma + mu)"),
+  list(label = "Growth Rate (r)",          value = round(growth_rate, 4),
+       unit = "/day", delta = "Log-linear fit on early incidence")
+)
+
+# ---------- Chart series ----------
+step_n  <- max(1, floor(n_obs / 40))
+obs_idx <- unique(c(seq(1, n_obs, by = step_n), n_obs))
+ts      <- outbreak_df[obs_idx, ]
+
+chart_series <- list(
+  months               = format(ts$date, "%Y-%m-%d"),
+  confirmed_observed   = ts$confirmed,
+  deaths_observed      = ts$confirmed_deaths,
+  recovered_observed   = ts$recovered,
+  seir_fitted_I        = predicted_I[obs_idx],
+  projection_dates     = format(max(outbreak_df$date) + seq_len(PROJECTION_DAYS), "%Y-%m-%d"),
+  projection_I         = sir_proj$I[-1],
+  projection_cum       = cumsum(c(tail(cumsum(predicted_I), 1), sir_proj$I[-1]))[-1],
+  cumulative_confirmed = cumsum(outbreak_df$new_infections)[obs_idx],
+  rt_series            = rep(R0_est, length(obs_idx)),
+  sir_S = sir_full$S[obs_idx],
+  sir_I = sir_full$I[obs_idx],
+  sir_R = sir_full$R[obs_idx],
+  sir_D = sir_full$D[obs_idx],
+  param_beta  = beta_est,
+  param_gamma = gamma_est,
+  param_mu    = mu_est,
+  # Coefficient time series (constant by construction, per-model)
+  coeff_beta  = rep(beta_est,   length(obs_idx)),
+  coeff_gamma = rep(gamma_est,  length(obs_idx)),
+  coeff_mu    = rep(mu_est,     length(obs_idx)),
+  # Train / test split markers (as fractions of the axis)
+  train_end_frac = round(train_n / n_obs, 3),
+  test_start_frac = round(train_n / n_obs, 3),
+  # For the predictive chart
+  train_perf = train_perf,
+  test_perf  = test_perf,
+  overall    = overall
+)
+
+# Zones only for the predictive chart
+n_pts <- length(chart_series$months)
+zones <- list(
+  list(from = 0,
+       to   = max(1, floor(n_pts * TRAIN_FRACTION)),
+       label = "Training window", color = "rgba(39,174,96,0.18)"),
+  list(from = max(1, floor(n_pts * TRAIN_FRACTION)),
+       to   = n_pts - 1,
+       label = "Test window",     color = "rgba(230,126,34,0.20)"),
+  list(from = n_pts - 1,
+       to   = n_pts + length(chart_series$projection_dates),
+       label = "Future prediction", color = "rgba(255,255,255,0.55)")
+)
+
+sliders <- list(
+  list(id = "beta",     label = "Transmission Rate (beta)", min = 0.05, max = 1.0, step = 0.01, value = round(beta_est, 2)),
+  list(id = "gamma",    label = "Recovery Rate (gamma)",    min = 0.02, max = 0.5, step = 0.01, value = round(gamma_est, 2)),
+  list(id = "mu",       label = "Mortality Rate (mu)",      min = 0.0,  max = 0.5, step = 0.01, value = round(mu_est, 2)),
+  list(id = "zoonotic", label = "Zoonotic Spillover",       min = 0, max = 50, step = 1, value = 12),
+  list(id = "interv",   label = "Intervention Efficacy",    min = 0, max = 100, step = 1, value = 35)
+)
+
+payload <- list(
+  generated_at       = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+  population_at_risk = POPULATION_AT_RISK,
+  projection_days    = PROJECTION_DAYS,
+  primary_parameters = list(beta = beta_est, gamma = gamma_est, mu = mu_est,
+                            R0 = R0_est, growth_rate = growth_rate,
+                            train_n = train_n, test_n = test_n),
+  performance        = list(train = train_perf, test = test_perf, overall = overall),
+  case_telemetry     = case_telemetry,
+  bio_coefficients   = bio_coefficients,
+  chart_series       = chart_series,
+  zones              = zones,
+  sliders            = sliders
+)
+
+if (!dir.exists("data")) dir.create("data", recursive = TRUE)
+jsonlite::write_json(payload, "data/ebola_data.json",
+                     auto_unbox = TRUE, pretty = TRUE, null = "null")
+message("Wrote data/ebola_data.json")
