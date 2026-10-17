@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+
     <div class="top-marquee">
         <div class="marquee-track">
             <span class="marquee-text">
@@ -22,7 +23,9 @@
 
     <header class="portal-header">
         <div class="header-inner">
-            <div class="virus-icon left-virus" aria-hidden="true">🦠</div>
+            <div class="virus-icon left-virus" aria-hidden="true">
+                <img src="assets/ebola-logo.svg" alt="Ebola 2026">
+            </div>
             <div class="header-title-block">
                 <h1 class="portal-title">Ebola Disease Outbreak Analysis Portal</h1>
                 <div class="live-indicator">
@@ -30,11 +33,14 @@
                     <span class="live-text">Daily Updated Data Analysis</span>
                 </div>
             </div>
-            <div class="virus-icon right-virus" aria-hidden="true">🦠</div>
+            <div class="virus-icon right-virus" aria-hidden="true">
+                <img src="assets/ebola-logo.svg" alt="Ebola 2026">
+            </div>
         </div>
     </header>
 
     <main class="portal-main">
+
         <section class="card-row">
             <h2 class="row-heading">Cumulative Case Telemetry</h2>
             <div class="cards-grid" id="caseTelemetryCards"></div>
@@ -53,15 +59,16 @@
                 <div class="slider-group" id="sliderGroup"></div>
                 <button class="reset-btn" id="resetBtn">Reset to Defaults</button>
                 <div class="zone-legend">
-                    <h3>Prediction Zones</h3>
+                    <h3>Chart Zones</h3>
                     <ul>
-                        <li><span class="swatch swatch-retro"></span> Dark Grey — Animal-to-Human (Retrospective)</li>
-                        <li><span class="swatch swatch-data"></span> Light Grey — Observed Data</li>
-                        <li><span class="swatch swatch-future"></span> White — Future Prediction</li>
+                        <li><span class="swatch swatch-train"></span> Training window</li>
+                        <li><span class="swatch swatch-test"></span> Test window</li>
+                        <li><span class="swatch swatch-future"></span> Future prediction</li>
                     </ul>
                 </div>
             </aside>
         </section>
+
     </main>
 
     <footer class="portal-footer">
