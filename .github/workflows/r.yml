@@ -117,6 +117,7 @@ jobs:
           cp -r js         _site/
           cp -r data       _site/
           cp -r reports    _site/
+          cp -r assets     _site/
           touch _site/.nojekyll
           find _site -maxdepth 2 -type f | sort | head -40
 
