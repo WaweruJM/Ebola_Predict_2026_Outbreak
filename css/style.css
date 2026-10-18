@@ -27,12 +27,12 @@ html, body {
     min-height: 100vh;
 }
 
-/* Background image behind everything */
+/* Background — uses the same image as the header icons */
 body::before {
     content: "";
     position: fixed;
     inset: 0;
-    background: url("../assets/background.jpg") center/cover no-repeat;
+    background: var(--bg-image, url("../assets/ebola-theme.jpg")) center/cover no-repeat;
     filter: brightness(0.55) saturate(1.1);
     z-index: -2;
 }
