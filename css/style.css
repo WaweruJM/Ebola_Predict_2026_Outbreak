@@ -32,17 +32,21 @@ body::before {
     content: "";
     position: fixed;
     inset: 0;
-    background: var(--bg-image, url("../assets/ebola-theme.jpg")) center/cover no-repeat;
-    filter: brightness(0.55) saturate(1.1);
+    background: var(--bg-image, url("../assets/ebola-theme.jpg"))
+                center/cover no-repeat;
+    filter: brightness(0.95) saturate(1.15) contrast(1.05);
     z-index: -2;
 }
 body::after {
     content: "";
     position: fixed;
     inset: 0;
-    background: linear-gradient(180deg,
-                rgba(6, 18, 34, 0.55) 0%,
-                rgba(6, 18, 34, 0.72) 100%);
+    background:
+        radial-gradient(
+            ellipse at center,
+            rgba(6, 18, 34, 0.10) 0%,
+            rgba(6, 18, 34, 0.45) 100%
+        );
     z-index: -1;
 }
 
@@ -80,21 +84,22 @@ body::after {
 .header-inner {
     max-width: 1500px;
     margin: 0 auto;
-    padding: 14px 28px;
     display: grid;
-    grid-template-columns: 220px 1fr 220px;
+    grid-template-columns: 180px 1fr 180px;   /* 140px icon + 20px breathing room each side */
+    padding: 18px 28px;
     align-items: center;
     gap: 20px;
 }
 .virus-icon { display: flex; justify-content: center; align-items: center; }
 .virus-icon img {
-    width: 72px;
-    height: 72px;
+    width: 140px;                    /* was 72px — roughly 2× */
+    height: 140px;                   /* was 72px — roughly 2× */
     border-radius: 50%;
     object-fit: cover;
-    object-position: 18% 42%;              /* centres on the virus in the render */
-    border: 3px solid var(--accent-soft);
-    box-shadow: 0 0 0 4px rgba(231,76,60,0.10);
+    object-position: 18% 42%;
+    border: 4px solid var(--accent-soft);
+    box-shadow: 0 0 0 6px rgba(231,76,60,0.12),
+                0 6px 20px rgba(0,0,0,0.35);   /* subtle lift off the header */
     background: #0b1929;
 }
 .header-title-block { text-align: center; }
@@ -342,9 +347,9 @@ body::after {
 }
 
 @media (max-width: 720px) {
-    .header-inner { grid-template-columns: 70px 1fr 70px; padding: 12px 14px; }
-    .virus-icon img { width: 70px; }
-    .portal-title { font-size: 1.05rem; }
+    .header-inner { grid-template-columns: 100px 1fr 100px; padding: 12px 14px; }
+    .virus-icon img { width: 84px; height: 84px; }
+    .portal-title   { font-size: 1.05rem; }
     .portal-main  { padding: 20px 14px 40px; }
     .portal-footer { flex-direction: column; text-align: center; }
 }
