@@ -86,11 +86,16 @@ body::after {
     align-items: center;
     gap: 20px;
 }
-.virus-icon { display: flex; justify-content: center; }
+.virus-icon { display: flex; justify-content: center; align-items: center; }
 .virus-icon img {
-    width: 200px;
-    height: auto;
-    max-height: 70px;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: 18% 42%;              /* centres on the virus in the render */
+    border: 3px solid var(--accent-soft);
+    box-shadow: 0 0 0 4px rgba(231,76,60,0.10);
+    background: #0b1929;
 }
 .header-title-block { text-align: center; }
 .portal-title {
