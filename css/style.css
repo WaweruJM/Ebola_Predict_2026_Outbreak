@@ -1,3 +1,6 @@
+/* ============================================================
+   RESET & TOKENS
+   ============================================================ */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -6,7 +9,7 @@
     --accent: #e74c3c;
     --accent-soft: #f5b7b1;
     --bg: #0b1929;
-    --bg-card: rgba(255, 255, 255, 0.78);
+    --bg-card: rgba(255, 255, 255, 0.82);   /* Lighter to show background */
     --bg-header: rgba(255, 255, 255, 0.92);
     --border: #0e2a4a;
     --text: #1f2d3d;
@@ -27,13 +30,14 @@ html, body {
     min-height: 100vh;
 }
 
-/* Background — uses the same image as the header icons */
+/* ============================================================
+   BACKGROUND (Lighter with Vignette)
+   ============================================================ */
 body::before {
     content: "";
     position: fixed;
     inset: 0;
-    background: var(--bg-image, url("../assets/ebola-theme.jpg"))
-                center/cover no-repeat;
+    background: var(--bg-image, url("../assets/ebola-theme.jpg")) center/cover no-repeat;
     filter: brightness(0.95) saturate(1.15) contrast(1.05);
     z-index: -2;
 }
@@ -41,16 +45,17 @@ body::after {
     content: "";
     position: fixed;
     inset: 0;
-    background:
-        radial-gradient(
-            ellipse at center,
-            rgba(6, 18, 34, 0.10) 0%,
-            rgba(6, 18, 34, 0.45) 100%
-        );
+    background: radial-gradient(
+        ellipse at center,
+        rgba(6, 18, 34, 0.10) 0%,
+        rgba(6, 18, 34, 0.45) 100%
+    );
     z-index: -1;
 }
 
-/* Marquee */
+/* ============================================================
+   TOP MARQUEE
+   ============================================================ */
 .top-marquee {
     width: 100%;
     background: linear-gradient(90deg, #061c33, #0e2a4a, #061c33);
@@ -71,12 +76,14 @@ body::after {
     100% { transform: translateX(-100%); }
 }
 
-/* Header */
+/* ============================================================
+   PORTAL HEADER
+   ============================================================ */
 .portal-header {
     position: sticky;
     top: 42px;
     z-index: 900;
-    background: rgba(255, 255, 255, 0.88);
+    background: var(--bg-header);
     border-bottom: 3px solid var(--accent);
     box-shadow: var(--shadow);
     backdrop-filter: blur(10px) saturate(1.3);
@@ -84,27 +91,26 @@ body::after {
 .header-inner {
     max-width: 1500px;
     margin: 0 auto;
-    display: grid;
-    grid-template-columns: 180px 1fr 180px;   /* 140px icon + 20px breathing room each side */
     padding: 18px 28px;
+    display: grid;
+    grid-template-columns: 180px 1fr 180px; /* Enlarged columns for bigger icons */
     align-items: center;
     gap: 20px;
 }
 .virus-icon { display: flex; justify-content: center; align-items: center; }
 .virus-icon img {
-    width: 140px;                    /* was 72px — roughly 2× */
-    height: 140px;                   /* was 72px — roughly 2× */
+    width: 140px;          /* Enlarged x2 */
+    height: 140px;         /* Enlarged x2 */
     border-radius: 50%;
     object-fit: cover;
     object-position: 18% 42%;
     border: 4px solid var(--accent-soft);
-    box-shadow: 0 0 0 6px rgba(231,76,60,0.12),
-                0 6px 20px rgba(0,0,0,0.35);   /* subtle lift off the header */
+    box-shadow: 0 0 0 6px rgba(231,76,60,0.12), 0 6px 20px rgba(0,0,0,0.35);
     background: #0b1929;
 }
 .header-title-block { text-align: center; }
 .portal-title {
-    font-size: 1.55rem;
+    font-size: 1.65rem;
     font-weight: 800;
     color: var(--primary);
     letter-spacing: -0.3px;
@@ -133,7 +139,9 @@ body::after {
     100% { opacity: 1;   transform: scale(1);   box-shadow: 0 0 0 0 rgba(231,76,60,0); }
 }
 
-/* Main */
+/* ============================================================
+   MAIN CONTENT & CARDS
+   ============================================================ */
 .portal-main {
     max-width: 1500px;
     margin: 0 auto;
@@ -142,7 +150,6 @@ body::after {
     flex-direction: column;
     gap: 28px;
 }
-
 .card-row {
     background: var(--bg-card);
     border: 2px solid var(--border);
@@ -161,29 +168,26 @@ body::after {
     margin-bottom: 18px;
 }
 
-/* Uniform 5-column card grid */
+/* 5-Column Card Grid */
 .cards-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    grid-auto-rows: 150px;   /* equal heights */
+    grid-auto-rows: 150px; /* Equal heights */
     gap: 16px;
 }
-@media (max-width: 1200px) {
-    .cards-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 720px) {
-    .cards-grid { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 140px; }
-}
+@media (max-width: 1200px) { .cards-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px)  { .cards-grid { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 140px; } }
 
+/* Individual Metric Cards */
 .metric-card {
     background: linear-gradient(160deg, #ffffff, #f1f6fb);
-    border: 2px solid var(--primary);
+    border: 2px solid var(--primary); /* Dark blue border */
     border-radius: var(--radius-sm);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    text-align: center;
+    text-align: center; /* Centered text */
     padding: 14px 12px;
     transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.25s ease;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
@@ -218,7 +222,9 @@ body::after {
 .metric-delta.up   { color: #c0392b; }
 .metric-delta.down { color: #27ae60; }
 
-/* Analysis row */
+/* ============================================================
+   ANALYSIS ROW (Charts + Sliders)
+   ============================================================ */
 .analysis-row {
     display: grid;
     grid-template-columns: 1fr 340px;
@@ -253,7 +259,7 @@ body::after {
 .chart-scroll { width: 100%; overflow-x: auto; padding-bottom: 8px; }
 .chart-canvas-wrap { position: relative; height: 320px; min-width: 720px; }
 
-/* Performance table inside predictive chart card */
+/* Performance Boxes inside Predictive Chart */
 .perf-box {
     margin-top: 14px;
     display: grid;
@@ -269,10 +275,9 @@ body::after {
     color: var(--text);
 }
 .perf-cell strong { color: var(--primary); font-weight: 800; }
-.perf-cell .k { display: block; font-size: 0.7rem; color: var(--text-muted);
-                text-transform: uppercase; letter-spacing: 0.4px; }
+.perf-cell .k { display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
 
-/* Slider column */
+/* Slider Column */
 .slider-column {
     background: var(--bg-card);
     border: 2px solid var(--border);
@@ -280,7 +285,7 @@ body::after {
     padding: 20px;
     box-shadow: var(--shadow);
     position: sticky;
-    top: 140px;
+    top: 160px; /* Adjusted for taller header */
     backdrop-filter: blur(8px) saturate(1.2);
 }
 .aside-heading { font-size: 1rem; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
@@ -314,7 +319,7 @@ body::after {
 }
 .reset-btn:hover { background: var(--primary-light); }
 
-/* Legend */
+/* Legends */
 .zone-legend { margin-top: 22px; padding-top: 18px; border-top: 1px solid #c9d4df; }
 .zone-legend h3 {
     font-size: 0.82rem; font-weight: 800; color: var(--primary);
@@ -333,23 +338,149 @@ body::after {
 .swatch-test   { background: var(--test-zone); }
 .swatch-future { background: var(--future-zone); }
 
-/* Footer */
+/* ============================================================
+   RESOURCES SECTION
+   ============================================================ */
+.resources-section {
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(8px) saturate(1.2);
+    margin-top: 10px;
+}
+.resources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+}
+.resource-card {
+    display: block;
+    background: linear-gradient(145deg, #ffffff, #f1f6fb);
+    border: 2px solid var(--primary);
+    border-radius: var(--radius-sm);
+    padding: 18px;
+    text-decoration: none;
+    color: var(--text);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.resource-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(14, 42, 74, 0.25);
+}
+.resource-icon { font-size: 1.8rem; display: block; margin-bottom: 8px; }
+.resource-card h3 { font-size: 1rem; font-weight: 800; color: var(--primary); margin-bottom: 6px; }
+.resource-card p  { font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; }
+
+/* ============================================================
+   RESOURCE PAGE CONTENT (For docs/*.html)
+   ============================================================ */
+.resource-body {
+    max-width: 900px;
+    margin: 0 auto;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--text);
+}
+.resource-body p       { margin-bottom: 14px; }
+.resource-body h3.resource-subhead {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin: 26px 0 10px;
+    padding-left: 10px;
+    border-left: 4px solid var(--accent);
+}
+.resource-body ul.resource-list,
+.resource-body ol.resource-list {
+    margin: 0 0 14px 22px;
+}
+.resource-body ul.resource-list li,
+.resource-body ol.resource-list li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+.resource-body code {
+    background: rgba(14, 42, 74, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.88em;
+}
+.resource-formula {
+    background: #0e2a4a;
+    color: #e8f2ff;
+    padding: 16px 20px;
+    border-radius: var(--radius-sm);
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    margin: 14px 0 20px;
+    border-left: 4px solid var(--accent);
+}
+.resource-back {
+    margin-top: 30px;
+    text-align: center;
+}
+.resource-back a {
+    display: inline-block;
+    padding: 10px 22px;
+    background: var(--primary);
+    color: #fff;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    font-size: 0.85rem;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+.resource-back a:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
 .portal-footer {
     background: rgba(6, 22, 40, 0.92);
     color: #cfe0ef;
     padding: 18px 32px;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     flex-wrap: wrap;
     gap: 10px;
     font-size: 0.78rem;
     backdrop-filter: blur(4px);
 }
+.footer-links {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 100%;
+}
+.footer-sep { color: rgba(255, 255, 255, 0.3); }
+.footer-links a {
+    color: #cfe0ef;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+.footer-links a:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
 
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
 @media (max-width: 720px) {
     .header-inner { grid-template-columns: 100px 1fr 100px; padding: 12px 14px; }
     .virus-icon img { width: 84px; height: 84px; }
-    .portal-title   { font-size: 1.05rem; }
+    .portal-title { font-size: 1.05rem; }
     .portal-main  { padding: 20px 14px 40px; }
     .portal-footer { flex-direction: column; text-align: center; }
 }
