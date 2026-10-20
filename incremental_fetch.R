@@ -1,10 +1,5 @@
 # ============================================================
-# incremental_fetch.R
-# Stepwise SIR modelling pipeline with:
-#   - time-varying beta(t) and gamma(t)
-#   - policy-effect term p(t)
-#   - optim()-trained SIR fitted to cumulative observed cases
-#   - 14-day projection starting from the last observed state
+# incremental_fetch.R — Stepwise SIR modelling (Confirmed Only)
 # ============================================================
 
 suppressPackageStartupMessages({
@@ -18,25 +13,13 @@ POPULATION_AT_RISK <- 20000000
 PROJECTION_DAYS    <- 14
 TRAIN_FRACTION     <- 0.80
 
-# ------------------------------------------------------------
-# STEP 1 — DATA PREPARATION
-# ------------------------------------------------------------
-message("STEP 1 — Data preparation")
-
-input_path <- if (file.exists("downloaded_timeseries.csv")) {
-  "downloaded_timeseries.csv"
-} else if (file.exists("data_cache.csv")) {
-  "data_cache.csv"
-} else stop("No input timeseries file found.")
+# ---------- STEP 1 & 2: DATA PREP & WRANGLING ----------
+message("STEP 1 & 2 — Data Preparation")
+input_path <- if (file.exists("downloaded_timeseries.csv")) "downloaded_timeseries.csv" else "data_cache.csv"
+if (!file.exists(input_path)) stop("No input file found.")
 
 raw <- readr::read_csv(input_path, show_col_types = FALSE)
 names(raw) <- tolower(names(raw))
-message("  Rows: ", nrow(raw))
-
-# ------------------------------------------------------------
-# STEP 2 — DATA WRANGLING (confirmed only)
-# ------------------------------------------------------------
-message("STEP 2 — Data wrangling")
 
 outbreak_df <- raw %>%
   transmute(
@@ -51,28 +34,16 @@ outbreak_df <- raw %>%
   arrange(date) %>%
   mutate(
     active_cases   = pmax(0, confirmed - confirmed_deaths - recovered),
-    cfr            = ifelse(confirmed > 0,
-                            100 * confirmed_deaths / confirmed, NA_real_),
-    new_infections = c(0, pmax(0, diff(confirmed))),
-    new_deaths     = c(0, pmax(0, diff(confirmed_deaths)))
+    cfr            = ifelse(confirmed > 0, 100 * confirmed_deaths / confirmed, NA_real_),
+    new_infections = c(0, pmax(0, diff(confirmed)))
   )
 
 n_obs <- nrow(outbreak_df)
-message("  Clean rows: ", n_obs, "  Range: ",
-        min(outbreak_df$date), " -> ", max(outbreak_df$date))
+last_date <- max(outbreak_df$date)
+message("  Latest date in data: ", last_date)
 readr::write_csv(outbreak_df, "data_cache.csv")
 
-train_n <- floor(n_obs * TRAIN_FRACTION)
-test_n  <- n_obs - train_n
-
-# ------------------------------------------------------------
-# STEP 3 — TIME-VARYING BIOLOGICAL COEFFICIENTS
-#   beta(t): rolling 14-day SIR fit on the recent window
-#   gamma(t): mean infectious period drifts 7 d -> 10 d -> 12 d
-#   p(t): policy-effect multiplier on beta (0..1, falling over time)
-# ------------------------------------------------------------
-message("STEP 3 — Time-varying coefficients")
-
+# ---------- STEP 3: SIR MODEL DEFINITION ----------
 sir_model <- function(time, state, parms) {
   with(as.list(c(state, parms)), {
     N  <- S + I + R + D
@@ -84,187 +55,109 @@ sir_model <- function(time, state, parms) {
   })
 }
 
-# Fit a single-window SIR to a slice of cumulative cases.
-fit_window_sir <- function(obs_cum, days, pop, i0_guess = 10) {
-  objective <- function(par) {
-    b  <- exp(par[1]); g <- exp(par[2]); i0 <- exp(par[3])
-    mu <- 0.05
-    s0 <- pop - i0
-    out <- tryCatch(
-      as.data.frame(ode(
-        y     = c(S = s0, I = i0, R = 0, D = 0),
-        times = days,
-        func  = sir_model,
-        parms = c(beta = b, gamma = g, mu = mu)
-      )),
-      error = function(e) NULL
-    )
-    if (is.null(out)) return(1e12)
-    pred <- out$I + out$R + out$D
-    sum((pred - obs_cum)^2) / length(obs_cum)
-  }
-  fit <- optim(
-    par     = log(c(0.5, 0.15, i0_guess)),
-    fn      = objective,
-    method  = "L-BFGS-B",
-    lower   = log(c(0.05, 0.02, 1)),
-    upper   = log(c(3.0,  1.0,  500)),
-    control = list(maxit = 500)
+# ---------- STEP 4: TRAINING (Fit to Cumulative Cases) ----------
+message("STEP 4 — Training SIR Model via optim()")
+train_n   <- floor(n_obs * TRAIN_FRACTION)
+train_idx <- 1:train_n
+train_obs <- outbreak_df$confirmed[train_idx]
+train_t   <- 0:(train_n - 1)
+
+# Objective: minimize SSE between observed cumulative cases and model (I+R+D)
+sir_objective <- function(par) {
+  beta  <- exp(par[1])
+  gamma <- exp(par[2])
+  i0    <- exp(par[3])
+  mu    <- 0.05 # Fixed mortality
+  
+  state0 <- c(S = POPULATION_AT_RISK - i0, I = i0, R = 0, D = 0)
+  out <- tryCatch(
+    as.data.frame(ode(state0, train_t, sir_model, c(beta=beta, gamma=gamma, mu=mu))),
+    error = function(e) NULL
   )
-  c(beta = exp(fit$par[1]), gamma = exp(fit$par[2]), I0 = exp(fit$par[3]))
+  if (is.null(out)) return(1e12)
+  
+  predicted_cum <- out$I + out$R + out$D
+  sum((predicted_cum - train_obs)^2)
 }
 
-WINDOW   <- 14
-beta_t   <- numeric(n_obs)
-gamma_t  <- numeric(n_obs)
-mu_t     <- numeric(n_obs)
-policy_t <- numeric(n_obs)
-
-for (i in seq_len(n_obs)) {
-  # Rolling window ending at i
-  start_i <- max(1, i - WINDOW + 1)
-  win_obs <- outbreak_df$confirmed[start_i:i]
-  win_days <- seq(0, length(win_obs) - 1)
-
-  fit <- tryCatch(
-    fit_window_sir(win_obs, win_days, POPULATION_AT_RISK),
-    error = function(e) c(beta = 0.5, gamma = 0.15, I0 = 10)
-  )
-
-  beta_t[i]  <- fit[["beta"]]
-  gamma_t[i] <- fit[["gamma"]]
-  mu_t[i]    <- 0.05
-
-  # Policy effect: interventions intensify as outbreak progresses.
-  # Start at 1.0, asymptote to ~0.35 by the last day.
-  policy_t[i] <- max(0.35, 1 - (i - 1) / max(1, n_obs - 1) * 0.65)
-}
-
-beta_eff_t <- beta_t * policy_t
-
-# Headline (end-of-series) coefficients used by the cards
-beta_est   <- tail(beta_eff_t, 1)
-gamma_est  <- tail(gamma_t,   1)
-mu_est     <- tail(mu_t,      1)
-R0_est     <- beta_est / (gamma_est + mu_est)
-growth_rate <- beta_est - gamma_est - mu_est
-
-message(sprintf("  beta(t_final)=%.4f  gamma(t_final)=%.4f  R0=%.3f",
-                beta_est, gamma_est, R0_est))
-
-# ------------------------------------------------------------
-# STEP 4 — FULL-WINDOW SIR FIT (for the predictive chart)
-#   Fit on the training window, evaluate on the full window,
-#   then project from the *last observed state*.
-# ------------------------------------------------------------
-message("STEP 4 — Full-window SIR fit")
-
-fit_full <- fit_window_sir(
-  outbreak_df$confirmed[1:train_n],
-  seq(0, train_n - 1),
-  POPULATION_AT_RISK
+# Initial guess: beta=0.5, gamma=0.1, I0=10
+fit <- optim(
+  par = log(c(0.5, 0.1, 10)),
+  fn = sir_objective,
+  method = "L-BFGS-B",
+  lower = log(c(0.01, 0.01, 1)),
+  upper = log(c(5.0, 1.0, 1000)),
+  control = list(maxit = 1000)
 )
 
-beta_fit  <- fit_full[["beta"]]
-gamma_fit <- fit_full[["gamma"]]
-I0_fit    <- fit_full[["I0"]]
-mu_fit    <- 0.05
-state0_fit <- c(S = POPULATION_AT_RISK - I0_fit, I = I0_fit, R = 0, D = 0)
-params_fit <- c(beta = beta_fit, gamma = gamma_fit, mu = mu_fit)
+beta_est  <- exp(fit$par[1])
+gamma_est <- exp(fit$par[2])
+I0_fit    <- exp(fit$par[3])
+mu_est    <- 0.05
+R0_est    <- beta_est / (gamma_est + mu_est)
 
-full_times <- seq(0, n_obs - 1)
-sir_full   <- as.data.frame(
-  ode(state0_fit, full_times, sir_model, params_fit)
-)
+message(sprintf("  Fitted: beta=%.4f, gamma=%.4f, R0=%.3f", beta_est, gamma_est, R0_est))
 
-# Fitted cumulative = I + R + D
+# ---------- STEP 5: TESTING & FULL FIT ----------
+message("STEP 5 — Evaluating on Full Window")
+full_t <- 0:(n_obs - 1)
+state0_full <- c(S = POPULATION_AT_RISK - I0_fit, I = I0_fit, R = 0, D = 0)
+sir_full <- as.data.frame(ode(state0_full, full_t, sir_model, c(beta=beta_est, gamma=gamma_est, mu=mu_est)))
+
 predicted_I <- sir_full$I + sir_full$R + sir_full$D
 observed_I  <- outbreak_df$confirmed
 
-train_mask <- seq_len(train_n)
-test_mask  <- seq(train_n + 1, n_obs)
-
-# ------------------------------------------------------------
-# STEP 5 — PERFORMANCE
-# ------------------------------------------------------------
+# Performance
 perf_metrics <- function(obs, pred) {
-  res    <- obs - pred
-  rmse   <- sqrt(mean(res^2, na.rm = TRUE))
-  mae    <- mean(abs(res), na.rm = TRUE)
-  ss_res <- sum(res^2, na.rm = TRUE)
-  ss_tot <- sum((obs - mean(obs, na.rm = TRUE))^2, na.rm = TRUE)
-  r2     <- if (ss_tot > 0) 1 - ss_res / ss_tot else NA_real_
-  list(rmse = rmse, mae = mae, r2 = r2)
+  res <- obs - pred
+  list(
+    rmse = sqrt(mean(res^2, na.rm = TRUE)),
+    mae  = mean(abs(res), na.rm = TRUE),
+    r2   = 1 - sum(res^2, na.rm = TRUE) / sum((obs - mean(obs, na.rm = TRUE))^2, na.rm = TRUE)
+  )
 }
-train_perf <- perf_metrics(observed_I[train_mask], predicted_I[train_mask])
-test_perf  <- perf_metrics(observed_I[test_mask],  predicted_I[test_mask])
-overall    <- perf_metrics(observed_I,             predicted_I)
+train_perf <- perf_metrics(observed_I[1:train_n], predicted_I[1:train_n])
+test_perf  <- perf_metrics(observed_I[(train_n+1):n_obs], predicted_I[(train_n+1):n_obs])
+overall    <- perf_metrics(observed_I, predicted_I)
 
-# ------------------------------------------------------------
-# STEP 6 — PROJECTION FROM LAST OBSERVED STATE
-# ------------------------------------------------------------
-proj_times <- seq(n_obs - 1, n_obs - 1 + PROJECTION_DAYS)
-
-# Anchor the projection at the observed state on the last day so
-# the future trajectory starts exactly where the data ends.
-last_obs <- outbreak_df[n_obs, ]
-anchor <- c(
-  S = POPULATION_AT_RISK - last_obs$confirmed,
-  I = last_obs$active_cases,
-  R = last_obs$recovered,
-  D = last_obs$confirmed_deaths
+# ---------- STEP 6: PROJECTION (Anchored to Last Observed State) ----------
+message("STEP 6 — 14-Day Projection")
+proj_t <- n_obs - 1 + 0:PROJECTION_DAYS
+last_row <- tail(sir_full, 1)
+# Anchor to observed state so projection starts where data ends
+anchor_state <- c(
+  S = POPULATION_AT_RISK - tail(outbreak_df$confirmed, 1),
+  I = tail(outbreak_df$active_cases, 1),
+  R = tail(outbreak_df$recovered, 1),
+  D = tail(outbreak_df$confirmed_deaths, 1)
 )
-sir_proj <- as.data.frame(
-  ode(anchor, proj_times, sir_model, params_fit)
-)
+sir_proj <- as.data.frame(ode(anchor_state, proj_t, sir_model, c(beta=beta_est, gamma=gamma_est, mu=mu_est)))
 proj_cum <- sir_proj$I + sir_proj$R + sir_proj$D
 
-# ------------------------------------------------------------
-# STEP 7 — EXPORT JSON
-# ------------------------------------------------------------
-latest   <- outbreak_df %>% slice_tail(n = 1)
-previous <- outbreak_df %>% slice_tail(n = 2) %>% slice_head(n = 1)
+# ---------- STEP 7: EXPORT JSON ----------
+latest   <- tail(outbreak_df, 1)
+previous <- tail(outbreak_df, 2)[1,]
 
 fmt_delta <- function(cur, prev, unit = "") {
-  if (length(prev) == 0 || is.na(prev) || is.na(cur)) return("--")
+  if (is.na(prev) || is.na(cur)) return("--")
   d <- cur - prev
-  paste0(ifelse(d >= 0, "+", ""), d,
-         if (nzchar(unit)) paste0(" ", unit) else "", " today")
-}
-trend_of <- function(cur, prev) {
-  if (length(prev) == 0 || is.na(cur) || is.na(prev)) return("")
-  if (cur > prev) "up" else if (cur < prev) "down" else ""
+  paste0(ifelse(d >= 0, "+", ""), d, if (nzchar(unit)) paste0(" ", unit) else "", " today")
 }
 
 case_telemetry <- list(
-  list(label = "Confirmed Cases",    value = latest$confirmed,
-       unit = "", delta = fmt_delta(latest$confirmed, previous$confirmed),
-       trend = trend_of(latest$confirmed, previous$confirmed)),
-  list(label = "Confirmed Deaths",   value = latest$confirmed_deaths,
-       unit = "", delta = fmt_delta(latest$confirmed_deaths, previous$confirmed_deaths),
-       trend = trend_of(latest$confirmed_deaths, previous$confirmed_deaths)),
-  list(label = "Recovered",          value = latest$recovered,
-       unit = "", delta = fmt_delta(latest$recovered, previous$recovered),
-       trend = trend_of(latest$recovered, previous$recovered)),
-  list(label = "Active Cases",       value = latest$active_cases,
-       unit = "", delta = fmt_delta(latest$active_cases, previous$active_cases),
-       trend = trend_of(latest$active_cases, previous$active_cases)),
-  list(label = "Case Fatality Rate", value = round(latest$cfr, 1),
-       unit = "%", delta = fmt_delta(latest$cfr, previous$cfr, "pts"),
-       trend = trend_of(latest$cfr, previous$cfr))
+  list(label = "Confirmed Cases",    value = latest$confirmed, unit = "", delta = fmt_delta(latest$confirmed, previous$confirmed), trend = ifelse(latest$confirmed >= previous$confirmed, "up", "down")),
+  list(label = "Confirmed Deaths",   value = latest$confirmed_deaths, unit = "", delta = fmt_delta(latest$confirmed_deaths, previous$confirmed_deaths), trend = ifelse(latest$confirmed_deaths >= previous$confirmed_deaths, "up", "down")),
+  list(label = "Recovered",          value = latest$recovered, unit = "", delta = fmt_delta(latest$recovered, previous$recovered), trend = ifelse(latest$recovered >= previous$recovered, "up", "down")),
+  list(label = "Active Cases",       value = latest$active_cases, unit = "", delta = fmt_delta(latest$active_cases, previous$active_cases), trend = ifelse(latest$active_cases >= previous$active_cases, "up", "down")),
+  list(label = "Case Fatality Rate", value = round(latest$cfr, 1), unit = "%", delta = fmt_delta(latest$cfr, previous$cfr, "pts"), trend = ifelse(latest$cfr >= previous$cfr, "up", "down"))
 )
 
 bio_coefficients <- list(
-  list(label = "beta (effective)", value = round(beta_est, 4), unit = "/day",
-       delta = "beta(t) * policy(t)"),
-  list(label = "gamma (recovery)", value = round(gamma_est, 4), unit = "/day",
-       delta = "1 / mean infectious period"),
-  list(label = "mu (mortality)",   value = round(mu_est, 4), unit = "/day",
-       delta = "fixed at 0.05"),
-  list(label = "R0 (basic repro.)",value = round(R0_est, 3), unit = "",
-       delta = "beta / (gamma + mu)"),
-  list(label = "Policy factor",    value = round(tail(policy_t, 1), 3), unit = "",
-       delta = "1 = no intervention, 0.35 = strong")
+  list(label = "beta (Transmission Rate)", value = round(beta_est, 4), unit = "/day", delta = "Fitted via NLS"),
+  list(label = "gamma (Recovery Rate)",    value = round(gamma_est, 4), unit = "/day", delta = "Fitted via NLS"),
+  list(label = "mu (Mortality Rate)",      value = round(mu_est, 4), unit = "/day", delta = "Fixed at 0.05"),
+  list(label = "R0 (Basic Reproduction)",  value = round(R0_est, 3), unit = "", delta = "beta / (gamma + mu)"),
+  list(label = "Growth Rate (r)",          value = round(beta_est - gamma_est - mu_est, 4), unit = "/day", delta = "beta - gamma - mu")
 )
 
 step_n  <- max(1, floor(n_obs / 40))
@@ -277,59 +170,46 @@ chart_series <- list(
   recovered_observed   = ts$recovered,
   deaths_observed      = ts$confirmed_deaths,
   seir_fitted_I        = predicted_I[obs_idx],
-  projection_dates     = format(max(outbreak_df$date) + seq_len(PROJECTION_DAYS), "%Y-%m-%d"),
+  projection_dates     = format(last_date + 1:PROJECTION_DAYS, "%Y-%m-%d"),
   projection_I         = proj_cum[-1],
   projection_cum       = cumsum(c(tail(cumsum(predicted_I), 1), proj_cum[-1]))[-1],
-  cumulative_confirmed = cumsum(outbreak_df$new_infections)[obs_idx],
-  rt_series            = rep(R0_est, length(obs_idx)),
   sir_I                = sir_full$I[obs_idx],
   sir_R                = sir_full$R[obs_idx],
   sir_D                = sir_full$D[obs_idx],
-  coeff_beta           = beta_eff_t[obs_idx],
-  coeff_gamma          = gamma_t[obs_idx],
-  coeff_mu             = mu_t[obs_idx]
+  coeff_beta           = rep(beta_est, length(obs_idx)),
+  coeff_gamma          = rep(gamma_est, length(obs_idx)),
+  coeff_mu             = rep(mu_est, length(obs_idx))
 )
 
+n_pts <- length(chart_series$months)
 zones <- list(
-  list(from = 0,
-       to   = max(1, floor(length(obs_idx) * TRAIN_FRACTION)),
-       label = "Training window",
-       color = "rgba(39,174,96,0.18)"),
-  list(from = max(1, floor(length(obs_idx) * TRAIN_FRACTION)),
-       to   = length(obs_idx) - 1,
-       label = "Test window",
-       color = "rgba(230,126,34,0.20)"),
-  list(from = length(obs_idx) - 1,
-       to   = length(obs_idx) + PROJECTION_DAYS,
-       label = "Future prediction",
-       color = "rgba(255,255,255,0.55)")
+  list(from = 0, to = floor(n_pts * TRAIN_FRACTION), label = "Training", color = "rgba(39,174,96,0.15)"),
+  list(from = floor(n_pts * TRAIN_FRACTION), to = n_pts - 1, label = "Test", color = "rgba(230,126,34,0.15)"),
+  list(from = n_pts - 1, to = n_pts + PROJECTION_DAYS, label = "Projection", color = "rgba(255,255,255,0.4)")
 )
 
 sliders <- list(
-  list(id = "beta",     label = "Transmission Rate (beta)", min = 0.05, max = 1.5, step = 0.01, value = round(beta_est, 2)),
-  list(id = "gamma",    label = "Recovery Rate (gamma)",    min = 0.02, max = 0.5, step = 0.01, value = round(gamma_est, 2)),
-  list(id = "mu",       label = "Mortality Rate (mu)",      min = 0.0,  max = 0.5, step = 0.01, value = round(mu_est, 2)),
-  list(id = "policy",   label = "Policy Effect (p)",        min = 0.1,  max = 1.0, step = 0.01, value = round(tail(policy_t, 1), 2)),
-  list(id = "interv",   label = "Intervention Efficacy",    min = 0,    max = 100, step = 1,    value = 35)
+  list(id = "beta", label = "Transmission Rate (beta)", min = 0.05, max = 1.5, step = 0.01, value = round(beta_est, 2)),
+  list(id = "gamma", label = "Recovery Rate (gamma)", min = 0.02, max = 0.5, step = 0.01, value = round(gamma_est, 2)),
+  list(id = "mu", label = "Mortality Rate (mu)", min = 0.0, max = 0.5, step = 0.01, value = round(mu_est, 2)),
+  list(id = "zoonotic", label = "Zoonotic Spillover", min = 0, max = 50, step = 1, value = 12),
+  list(id = "interv", label = "Intervention Efficacy", min = 0, max = 100, step = 1, value = 35)
 )
 
 payload <- list(
-  generated_at       = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+  generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+  last_data_date = format(last_date, "%Y-%m-%d"),
   population_at_risk = POPULATION_AT_RISK,
-  projection_days    = PROJECTION_DAYS,
-  primary_parameters = list(
-    beta = beta_est, gamma = gamma_est, mu = mu_est, R0 = R0_est,
-    growth_rate = growth_rate, train_n = train_n, test_n = test_n
-  ),
+  projection_days = PROJECTION_DAYS,
+  primary_parameters = list(beta = beta_est, gamma = gamma_est, mu = mu_est, R0 = R0_est, growth_rate = beta_est - gamma_est - mu_est),
   performance = list(train = train_perf, test = test_perf, overall = overall),
-  case_telemetry   = case_telemetry,
+  case_telemetry = case_telemetry,
   bio_coefficients = bio_coefficients,
-  chart_series     = chart_series,
-  zones            = zones,
-  sliders          = sliders
+  chart_series = chart_series,
+  zones = zones,
+  sliders = sliders
 )
 
 if (!dir.exists("data")) dir.create("data", recursive = TRUE)
-jsonlite::write_json(payload, "data/ebola_data.json",
-                     auto_unbox = TRUE, pretty = TRUE, null = "null")
-message("Wrote data/ebola_data.json — ", payload$generated_at)
+jsonlite::write_json(payload, "data/ebola_data.json", auto_unbox = TRUE, pretty = TRUE, null = "null")
+message("Wrote data/ebola_data.json — last date: ", payload$last_data_date)
