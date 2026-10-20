@@ -8,8 +8,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body>
+<body style="--bg-image: url('assets/ebola-theme.jpg');">
 
+    <!-- ============================================
+         TOP MARQUEE
+         ============================================ -->
     <div class="top-marquee">
         <div class="marquee-track">
             <span class="marquee-text">
@@ -21,6 +24,9 @@
         </div>
     </div>
 
+    <!-- ============================================
+         HEADER
+         ============================================ -->
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
@@ -39,18 +45,24 @@
         </div>
     </header>
 
+    <!-- ============================================
+         MAIN CONTENT
+         ============================================ -->
     <main class="portal-main">
 
+        <!-- Row 1: Cumulative Case Telemetry -->
         <section class="card-row">
             <h2 class="row-heading">Cumulative Case Telemetry</h2>
             <div class="cards-grid" id="caseTelemetryCards"></div>
         </section>
 
+        <!-- Row 2: Biological Coefficients -->
         <section class="card-row">
             <h2 class="row-heading">Biological Coefficients</h2>
             <div class="cards-grid" id="bioCoeffCards"></div>
         </section>
 
+        <!-- Row 3: Charts and Sliders -->
         <section class="analysis-row">
             <div class="charts-column" id="chartsColumn"></div>
             <aside class="slider-column">
@@ -69,13 +81,49 @@
             </aside>
         </section>
 
+        <!-- Row 4: Resources -->
+        <section class="resources-section">
+            <h2 class="row-heading">Resources</h2>
+            <div class="resources-grid">
+                <a href="docs/sir-model.html" class="resource-card">
+                    <span class="resource-icon">🦠</span>
+                    <h3>SIR Model of Infectious Diseases</h3>
+                    <p>Understanding the Susceptible–Infectious–Recovered framework and its assumptions.</p>
+                </a>
+                <a href="docs/ode.html" class="resource-card">
+                    <span class="resource-icon">📐</span>
+                    <h3>Ordinary Differential Equations</h3>
+                    <p>The mathematical foundation for compartmental modelling.</p>
+                </a>
+                <a href="docs/desolve.html" class="resource-card">
+                    <span class="resource-icon">💻</span>
+                    <h3>deSolve Package in R</h3>
+                    <p>Numerical solvers for ODE systems used in this analysis.</p>
+                </a>
+                <a href="docs/workflow.html" class="resource-card">
+                    <span class="resource-icon">📊</span>
+                    <h3>Analysis Workflow in R</h3>
+                    <p>Step-by-step data preparation, fitting, testing, and projection.</p>
+                </a>
+            </div>
+        </section>
+
     </main>
 
+    <!-- ============================================
+         FOOTER
+         ============================================ -->
     <footer class="portal-footer">
-        <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
-        <span>Data sources: WHO AfroGIS, RDHUB</span>
+        <div class="footer-links">
+            <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
+            <span class="footer-sep">|</span>
+            <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
+            <span class="footer-sep">|</span>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+        </div>
     </footer>
 
+    <!-- Scripts -->
     <script src="js/main.js" defer></script>
 </body>
 </html>
