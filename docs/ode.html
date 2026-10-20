@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordinary Differential Equations — Ebola Portal</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body style="--bg-image: url('../assets/ebola-theme.jpg');">
+
+    <div class="top-marquee">
+        <div class="marquee-track">
+            <span class="marquee-text">
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+            </span>
+        </div>
+    </div>
+
+    <header class="portal-header">
+        <div class="header-inner">
+            <div class="virus-icon left-virus" aria-hidden="true">
+                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+            </div>
+            <div class="header-title-block">
+                <h1 class="portal-title">Ordinary Differential Equations</h1>
+                <div class="live-indicator">
+                    <span class="blink-dot"></span>
+                    <span class="live-text">Resource Library</span>
+                </div>
+            </div>
+            <div class="virus-icon right-virus" aria-hidden="true">
+                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+            </div>
+        </div>
+    </header>
+
+    <main class="portal-main">
+        <section class="card-row">
+            <h2 class="row-heading">Why ODEs Drive Compartmental Models</h2>
+            <div class="resource-body">
+                <p>
+                    An <strong>ordinary differential equation (ODE)</strong> describes how a quantity changes
+                    with respect to a single independent variable — in our case, <em>time</em>.
+                    Epidemic compartments change continuously as people become infected, recover, or
+                    die, so ODEs are the natural language for describing those flows.
+                </p>
+
+                <h3 class="resource-subhead">The Basic Idea</h3>
+                <p>
+                    An ODE has the form
+                </p>
+                <pre class="resource-formula">dS/dt = f(S, I, R, D, t)</pre>
+                <p>
+                    which reads: "the rate of change of S with respect to time is some function f
+                    of the current compartment sizes and time." The SIR model is simply a system of
+                    such equations — one per compartment — solved simultaneously.
+                </p>
+
+                <h3 class="resource-subhead">An Initial Value Problem</h3>
+                <p>
+                    To determine a specific trajectory, every ODE system needs <strong>initial conditions</strong>:
+                </p>
+                <pre class="resource-formula">S(0) = S₀    I(0) = I₀    R(0) = 0    D(0) = 0</pre>
+                <p>
+                    In this portal, S₀ = N − I₀ where N = 20,000,000 and I₀ is the number of
+                    confirmed active cases on the first day of data.
+                </p>
+
+                <h3 class="resource-subhead">Why There Is No Closed-Form Solution</h3>
+                <p>
+                    Unlike simple ODEs from calculus, the SIR system is <strong>nonlinear</strong>
+                    (because of the S·I product). There is no analytical formula for S(t), I(t),
+                    etc. Therefore we must integrate numerically — which is what the
+                    <code>deSolve</code> package in R does.
+                </p>
+
+                <h3 class="resource-subhead">The Method of Numerical Integration</h3>
+                <p>
+                    Numerical solvers step forward in small time increments. At each step they approximate
+                    the derivative using the equations and update the state:
+                </p>
+                <pre class="resource-formula">S(t + h) ≈ S(t) + h · f(S(t), t)</pre>
+                <p>
+                    This is the Euler method, the simplest scheme. Production-grade solvers
+                    (like <code>lsoda</code> in <code>deSolve</code>) use adaptive step sizes and
+                    higher-order methods for accuracy and stability.
+                </p>
+
+                <h3 class="resource-subhead">Stiffness and Stability</h3>
+                <p>
+                    When compartments differ in scale by many orders of magnitude — for example, when
+                    the population is 20 million and active cases are in the hundreds — the ODE system
+                    is called <strong>stiff</strong>. Naive solvers may fail or require tiny steps.
+                    <code>lsoda</code> automatically switches between stiff and non-stiff methods,
+                    which is why it is the default in <code>deSolve</code>.
+                </p>
+
+                <h3 class="resource-subhead">Key Takeaways</h3>
+                <ul class="resource-list">
+                    <li>ODE models describe <em>rates</em>, not amounts — the solution yields amounts over time.</li>
+                    <li>Initial conditions matter: a different I₀ produces a different entire trajectory.</li>
+                    <li>Numerical integration replaces the analytical solution.</li>
+                    <li>Stiffness is common in epidemic models with large populations and small case counts.</li>
+                </ul>
+
+                <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="portal-footer">
+        <div class="footer-links">
+            <span>© 2026 Ebola Outbreak Analysis Portal</span>
+            <span>|</span>
+            <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
+            <span>|</span>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+        </div>
+    </footer>
+
+</body>
+</html>
