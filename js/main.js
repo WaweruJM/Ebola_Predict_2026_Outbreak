@@ -35,27 +35,58 @@ function renderSliders() {
         <span class="val" id="val-${s.id}">${s.value}</span>
       </label>
       <input type="range" id="slider-${s.id}"
-             min="${s.min}" max="${s.max}" step="${s.step}" value="${s.value}">`;
+             min="${s.min}" max="${s.max}" step="${s.step}" value="${s.value}">
+    `;
     group.appendChild(item);
     const input = item.querySelector('input');
     const valEl = item.querySelector('.val');
-    input.addEventListener('input', () => {
-      valEl.textContent = input.value;
-      updateCharts();
-    });
-  });
-}
-function resetSliders() {
-  DATA.sliders.forEach(s => {
-    const input = document.getElementById(`slider-${s.id}`);
-    if (input) {
-      input.value = s.value;
-      document.getElementById(`val-${s.id}`).textContent = s.value;
+    if (!input.dataset.bound) {
+      input.dataset.bound = "1";
+      input.addEventListener('input', () => {
+        valEl.textContent = input.value;
+        updateCharts();
+      });
     }
   });
-  updateCharts();
 }
 
+/* Only datasets that are explicitly adjustable get touched.
+   Observed confirmed stays fixed so the graph no longer deflects
+   each time the sliders change. */
+function updateCharts() {
+  const beta   = parseFloat($('#slider-beta')?.value   ?? 0.42);
+  const gamma  = parseFloat($('#slider-gamma')?.value  ?? 0.13);
+  const mu     = parseFloat($('#slider-mu')?.value     ?? 0.05);
+  const policy = parseFloat($('#slider-policy')?.value ?? 1.0);
+  const interv = parseFloat($('#slider-interv')?.value ?? 35);
+
+  const rt_eff = ((beta * policy) / (gamma + mu)) * (1 - interv / 100);
+  const scale  = Math.max(0.3, Math.min(2.0, rt_eff));
+
+  // Predictive chart: only fitted & projection datasets are adjustable.
+  const pc = charts.predictiveChart;
+  if (pc) {
+    const fitted = pc.data.datasets.find(d => d.label === 'SIR fitted');
+    const proj   = pc.data.datasets.find(d => d.label.startsWith('Projection'));
+    if (fitted) fitted.data = fitted.data.map(v => v == null ? null : +(v * scale).toFixed(2));
+    if (proj)   proj.data   = proj.data.map(v   => v == null ? null : +(v * scale).toFixed(2));
+    pc.update('none');
+  }
+
+  // Coefficient chart: replace with new flat values.
+  const cc = charts.coeffChart;
+  if (cc) {
+    const bDs = cc.data.datasets.find(d => d.label.startsWith('beta'));
+    const gDs = cc.data.datasets.find(d => d.label.startsWith('gamma'));
+    const mDs = cc.data.datasets.find(d => d.label.startsWith('mu'));
+    if (bDs) bDs.data = bDs.data.map(() => +(beta * policy).toFixed(3));
+    if (gDs) gDs.data = gDs.data.map(() => +gamma.toFixed(3));
+    if (mDs) mDs.data = mDs.data.map(() => +mu.toFixed(3));
+    cc.update('none');
+  }
+
+  // Leave confirmedChart and sirPopChart untouched — they show observed data.
+}
 // Zone plugin (train green, test amber, future white) — used ONLY on
 // the predictive chart when opts.zones is provided.
 const zoneBandsPlugin = {
