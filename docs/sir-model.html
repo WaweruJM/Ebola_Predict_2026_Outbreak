@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIR Model of Infectious Diseases — Ebola Portal</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body style="--bg-image: url('../assets/ebola-theme.jpg');">
+
+    <div class="top-marquee">
+        <div class="marquee-track">
+            <span class="marquee-text">
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+            </span>
+        </div>
+    </div>
+
+    <header class="portal-header">
+        <div class="header-inner">
+            <div class="virus-icon left-virus" aria-hidden="true">
+                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+            </div>
+            <div class="header-title-block">
+                <h1 class="portal-title">SIR Model of Infectious Diseases</h1>
+                <div class="live-indicator">
+                    <span class="blink-dot"></span>
+                    <span class="live-text">Resource Library</span>
+                </div>
+            </div>
+            <div class="virus-icon right-virus" aria-hidden="true">
+                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+            </div>
+        </div>
+    </header>
+
+    <main class="portal-main">
+        <section class="card-row">
+            <h2 class="row-heading">What is the SIR Model?</h2>
+            <div class="resource-body">
+                <p>
+                    The <strong>SIR model</strong> is one of the foundational frameworks of mathematical
+                    epidemiology. It divides a population into compartments that track how individuals
+                    move through different states of infection over time.
+                </p>
+
+                <h3 class="resource-subhead">The Three Classic Compartments</h3>
+                <ul class="resource-list">
+                    <li><strong>S — Susceptible:</strong> Individuals who have never been infected and can contract the disease.</li>
+                    <li><strong>I — Infectious:</strong> Individuals who are currently infected and can transmit the pathogen to susceptible people.</li>
+                    <li><strong>R — Recovered:</strong> Individuals who have acquired immunity (through recovery or vaccination) and can no longer be infected or transmit.</li>
+                </ul>
+
+                <h3 class="resource-subhead">Extension Used in This Portal</h3>
+                <p>
+                    Ebola has a very high case-fatality rate, so this portal uses an extended
+                    <strong>SIRD</strong> structure with a fourth compartment:
+                </p>
+                <ul class="resource-list">
+                    <li><strong>D — Deceased:</strong> Individuals who died from the infection.</li>
+                </ul>
+
+                <h3 class="resource-subhead">The Governing Equations</h3>
+                <pre class="resource-formula">
+dS/dt = −β · S · I / N
+dI/dt =  β · S · I / N − (γ + μ) · I
+dR/dt =  γ · I
+dD/dt =  μ · I</pre>
+
+                <p>Where each symbol has a direct epidemiological meaning:</p>
+                <ul class="resource-list">
+                    <li><strong>β (beta)</strong> — the transmission rate: how many effective contacts a single infectious individual makes per day, weighted by the probability of transmission per contact.</li>
+                    <li><strong>γ (gamma)</strong> — the recovery rate: the inverse of the mean infectious period. If the average person stays infectious for 10 days, γ = 1/10 = 0.1 per day.</li>
+                    <li><strong>μ (mu)</strong> — the mortality rate out of the infectious compartment.</li>
+                    <li><strong>N</strong> — total population size (S + I + R + D).</li>
+                </ul>
+
+                <h3 class="resource-subhead">The Reproduction Number</h3>
+                <p>
+                    The single most informative summary quantity is the <strong>basic reproduction number</strong>:
+                </p>
+                <pre class="resource-formula">R₀ = β / (γ + μ)</pre>
+                <p>
+                    R₀ represents the expected number of secondary infections caused by one infectious
+                    individual in a fully susceptible population. If R₀ &gt; 1, the outbreak grows;
+                    if R₀ &lt; 1, it shrinks. Interventions aim to reduce the <em>effective</em>
+                    reproduction number Rₜ below 1.
+                </p>
+
+                <h3 class="resource-subhead">Assumptions and Limitations</h3>
+                <ul class="resource-list">
+                    <li>Homogeneous mixing: all individuals contact each other with equal probability.</li>
+                    <li>No latent period: newly infected individuals become infectious immediately.</li>
+                    <li>Permanent immunity after recovery.</li>
+                    <li>Closed population: no births, deaths from other causes, or migration.</li>
+                </ul>
+                <p>
+                    These assumptions are approximations. In practice, models are calibrated
+                    against observed incidence and re-estimated as new data arrives — exactly what
+                    the Ebola Portal does daily.
+                </p>
+
+                <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="portal-footer">
+        <div class="footer-links">
+            <span>© 2026 Ebola Outbreak Analysis Portal</span>
+            <span>|</span>
+            <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
+            <span>|</span>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+        </div>
+    </footer>
+
+</body>
+</html>
