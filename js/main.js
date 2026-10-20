@@ -385,7 +385,7 @@ const FALLBACK_DATA = {
 
 async function loadData() {
   try {
-    const res = await fetch(`${DATA_URL}?v=${Date.now()}`);
+    const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     DATA = await res.json();
   } catch (err) {
