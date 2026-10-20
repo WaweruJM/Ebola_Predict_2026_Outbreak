@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>deSolve Package in R — Ebola Portal</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body style="--bg-image: url('../assets/ebola-theme.jpg');">
+
+    <div class="top-marquee">
+        <div class="marquee-track">
+            <span class="marquee-text">
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+                Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026
+                &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+            </span>
+        </div>
+    </div>
+
+    <header class="portal-header">
+        <div class="header-inner">
+            <div class="virus-icon left-virus" aria-hidden="true">
+                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+            </div>
+            <div class="header-title-block">
+                <h1 class="portal-title">deSolve Package in R</h1>
+                <div class="live-indicator">
+                    <span class="blink-dot"></span>
+                    <span class="live-text">Resource Library</span>
+                </div>
+            </div>
+            <div class="virus-icon right-virus" aria-hidden="true">
+                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+            </div>
+        </div>
+    </header>
+
+    <main class="portal-main">
+        <section class="card-row">
+            <h2 class="row-heading">Solving ODEs with deSolve</h2>
+            <div class="resource-body">
+                <p>
+                    <strong>deSolve</strong> is the standard R package for solving initial value
+                    problems in ordinary differential equations. It provides a unified interface
+                    to a wide range of numerical solvers, including the widely used <code>lsoda</code>.
+                </p>
+
+                <h3 class="resource-subhead">The Standard Pattern</h3>
+                <p>
+                    Every <code>deSolve</code> model follows the same three-step recipe:
+                </p>
+                <ol class="resource-list">
+                    <li>Define a function that returns the derivatives of each state variable.</li>
+                    <li>Set initial conditions and parameter values.</li>
+                    <li>Call <code>ode()</code> with the state, times, function and parameters.</li>
+                </ol>
+
+                <h3 class="resource-subhead">The SIR Model in deSolve Syntax</h3>
+                <pre class="resource-formula">library(deSolve)
+
+sir_model &lt;- function(time, state, parms) {
+  with(as.list(c(state, parms)), {
+    N  &lt;- S + I + R + D
+    dS &lt;- -beta * S * I / N
+    dI &lt;-  beta * S * I / N - (gamma + mu) * I
+    dR &lt;-  gamma * I
+    dD &lt;-  mu * I
+    list(c(dS, dI, dR, dD))
+  })
+}
+
+state0 &lt;- c(S = 19999990, I = 10, R = 0, D = 0)
+params &lt;- c(beta = 0.5, gamma = 0.15, mu = 0.05)
+times  &lt;- 0:100
+
+out &lt;- ode(state0, times, sir_model, params)</pre>
+
+                <p>The result is a data frame with one row per time point and one column per compartment.</p>
+
+                <h3 class="resource-subhead">Choosing the Right Solver</h3>
+                <ul class="resource-list">
+                    <li><strong>lsoda</strong> — the default. Auto-switches between stiff and non-stiff methods. Best for most epidemiological models.</li>
+                    <li><strong>vode</strong> — variable-coefficient solver, good for long integrations.</li>
+                    <li><strong>ode45</strong> (a.k.a. <code>rk45dp7</code>) — classic non-stiff Runge–Kutta; fast but may fail on stiff systems.</li>
+                    <li><strong>radau</strong> — implicit solver for very stiff systems.</li>
+                </ul>
+
+                <h3 class="resource-subhead">Calibration with optim()</h3>
+                <p>
+                    <code>deSolve</code> only <em>solves</em> an ODE once you provide parameters. To estimate
+                    the parameters from data, we pair it with <code>optim()</code>:
+                </p>
+                <pre class="resource-formula">sir_objective &lt;- function(par) {
+  beta  &lt;- exp(par[1])
+  gamma &lt;- exp(par[2])
+  i0    &lt;- exp(par[3])
+  state0 &lt;- c(S = 2e7 - i0, I = i0, R = 0, D = 0)
+  out &lt;- ode(state0, times, sir_model,
+             c(beta = beta, gamma = gamma, mu = 0.05))
+  predicted &lt;- out$I + out$R + out$D
+  sum((predicted - observed)^2)
+}
+
+fit &lt;- optim(
+  par    = log(c(0.5, 0.1, 10)),
+  fn     = sir_objective,
+  method = "L-BFGS-B",
+  lower  = log(c(0.01, 0.01, 1)),
+  upper  = log(c(5.0,  1.0,  1000))
+)</pre>
+                <p>
+                    The logarithmic transformation ensures that <code>optim()</code> always proposes
+                    <em>positive</em> parameter values — a requirement for all epidemiological rates.
+                    The <code>L-BFGS-B</code> method adds box constraints for additional safety.
+                </p>
+
+                <h3 class="resource-subhead">Full-Fit and Projection Flow</h3>
+                <ol class="resource-list">
+                    <li>Fit the model to the <em>training window</em> using <code>optim()</code>.</li>
+                    <li>Solve the ODE over the <em>full observed window</em> to evaluate fit against the test data.</li>
+                    <li>Anchor a new solve at the <em>last observed state</em> and integrate forward for the projection horizon.</li>
+                </ol>
+                <p>
+                    Anchoring the projection at the last observed state is critical: it ensures that
+                    the projected curve starts exactly where the observed curve ends, avoiding the
+                    "jump" that plagues naive extrapolations.
+                </p>
+
+                <h3 class="resource-subhead">Practical Tips</h3>
+                <ul class="resource-list">
+                    <li>Always inspect the return object — if <code>ode()</code> silently returns <code>NA</code> rows, the parameters were too extreme.</li>
+                    <li>Wrap the objective in <code>tryCatch()</code> so a failed integration returns a large penalty instead of crashing the fit.</li>
+                    <li>Bound the parameters tightly (<code>lower = </code>, <code>upper = </code>) to avoid unphysical estimates.</li>
+                    <li>Normalise the sum of squared errors by the number of observations so RMSE and MAE are interpretable.</li>
+                </ul>
+
+                <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="portal-footer">
+        <div class="footer-links">
+            <span>© 2026 Ebola Outbreak Analysis Portal</span>
+            <span>|</span>
+            <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
+            <span>|</span>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+        </div>
+    </footer>
+
+</body>
+</html>
