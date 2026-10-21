@@ -123,29 +123,18 @@ sir_proj <- as.data.frame(ode(anchor_state, proj_t, sir_model, c(beta=beta_est, 
 proj_cum <- sir_proj$I + sir_proj$R + sir_proj$D
 
 # ---------- STEP 7: TELEMETRY & EXPORT JSON ----------
-# Anchor logic: Determine if the upstream data actually updated in the last 24 hours.
-# We compare the absolute last date in the data to the current system date.
-# If the last date is NOT today or yesterday, we assume the data is stale.
-
+# Anchor comparison STRICTLY to the real calendar date of the server (UTC).
 today_date     <- Sys.Date()
 yesterday_date <- today_date - 1
 
-# Extract the two most recent calendar days present in the dataset
-dates_present  <- sort(unique(outbreak_df$date), decreasing = TRUE)
-most_recent_date <- dates_present[1]
-second_recent_date <- if(length(dates_present) > 1) dates_present[2] else NA
+# Find the exact row for today and yesterday in the dataset.
+today_row     <- outbreak_df %>% filter(date == today_date)
+yesterday_row <- outbreak_df %>% filter(date == yesterday_date)
 
-# Check if the most recent date is within the last 24-48 hours
-# (Allowing 48 hours accounts for the 05:00 UTC run time and timezone differences)
-is_current_data <- (today_date - most_recent_date) <= 1
+# Determine if BOTH today and yesterday actually exist in the data.
+has_24h_delta <- (nrow(today_row) > 0) && (nrow(yesterday_row) > 0)
 
-# Find the rows
-latest_row  <- outbreak_df %>% filter(date == most_recent_date)
-prev_row    <- outbreak_df %>% filter(date == second_recent_date)
-
-# Determine if we have valid 24-hour data (must have both rows and current data)
-has_24h_delta <- is_current_data && nrow(prev_row) > 0
-
+# Helper functions for formatting
 fmt_delta <- function(cur, prev, unit = "", has_data) {
   if (!has_data) return("No entries last 24 hrs")
   d <- cur - prev
@@ -158,19 +147,21 @@ trend_val <- function(cur, prev, has_data) {
   if (cur > prev) "up" else if (cur < prev) "down" else ""
 }
 
-# Safe extraction values for the cards
-safe_confirmed <- latest_row$confirmed
-safe_deaths    <- latest_row$confirmed_deaths
-safe_recov     <- latest_row$recovered
-safe_active    <- latest_row$active_cases
-safe_cfr       <- round(latest_row$cfr, 1)
+# If today exists, use its values. Otherwise, fall back to the absolute last data point.
+card_values <- if (nrow(today_row) > 0) today_row else tail(outbreak_df, 1)
 
-# Comparison values (only if has_24h_delta is TRUE)
-prev_confirmed <- if(has_24h_delta) prev_row$confirmed else NA
-prev_deaths    <- if(has_24h_delta) prev_row$confirmed_deaths else NA
-prev_recov     <- if(has_24h_delta) prev_row$recovered else NA
-prev_active    <- if(has_24h_delta) prev_row$active_cases else NA
-prev_cfr       <- if(has_24h_delta) prev_row$cfr else NA
+safe_confirmed <- card_values$confirmed
+safe_deaths    <- card_values$confirmed_deaths
+safe_recov     <- card_values$recovered
+safe_active    <- card_values$active_cases
+safe_cfr       <- round(card_values$cfr, 1)
+
+# Extract comparison values only if valid 24h data exists.
+prev_confirmed <- if(has_24h_delta) yesterday_row$confirmed else NA
+prev_deaths    <- if(has_24h_delta) yesterday_row$confirmed_deaths else NA
+prev_recov     <- if(has_24h_delta) yesterday_row$recovered else NA
+prev_active    <- if(has_24h_delta) yesterday_row$active_cases else NA
+prev_cfr       <- if(has_24h_delta) yesterday_row$cfr else NA
 
 case_telemetry <- list(
   list(label = "Confirmed Cases",    value = safe_confirmed, unit = "", 
