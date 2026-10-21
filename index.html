@@ -4,11 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ebola Disease Outbreak Analysis Portal 2026</title>
-    <link rel="stylesheet" href="css/style.css?v=8">
+    
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="css/style.css?v=9">
+    
+    <!-- Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Direct Background Override (Bypasses CSS relative paths) -->
+    <style>
+        body::before {
+            background-image: url('/Ebola_Predict_2026_Outbreak/assets/ebola-theme.jpg') !important;
+        }
+    </style>
 </head>
-<body style="--bg-image: url('assets/ebola-theme.jpg');">
+<body>
 
     <!-- TOP MARQUEE -->
     <div class="top-marquee">
@@ -26,7 +37,8 @@
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
-                <img src="assets/ebola-theme.jpg" alt="Ebola virus">
+                <!-- Absolute path ensures the icon loads on the home page -->
+                <img src="/Ebola_Predict_2026_Outbreak/assets/ebola-theme.jpg" alt="Ebola virus">
             </div>
             <div class="header-title-block">
                 <h1 class="portal-title">Ebola Disease Outbreak Analysis Portal</h1>
@@ -36,7 +48,8 @@
                 </div>
             </div>
             <div class="virus-icon right-virus" aria-hidden="true">
-                <img src="assets/ebola-theme.jpg" alt="Ebola virus">
+                <!-- Absolute path ensures the icon loads on the home page -->
+                <img src="/Ebola_Predict_2026_Outbreak/assets/ebola-theme.jpg" alt="Ebola virus">
             </div>
         </div>
     </header>
@@ -115,6 +128,7 @@
         </div>
     </footer>
 
+    <!-- Scripts -->
     <script src="js/main.js" defer></script>
 </body>
 </html>
