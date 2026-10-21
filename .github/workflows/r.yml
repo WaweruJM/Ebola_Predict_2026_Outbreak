@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -15,10 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  execute-pipeline:
+  build:
     runs-on: ubuntu-latest
-
-    # R_LIBS_USER is set at the job level so every step inherits it.
     env:
       R_LIBS_USER: ${{ github.workspace }}/.Rlib
 
@@ -56,20 +54,10 @@ jobs:
             libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
             libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
 
-      # Make R_LIBS_USER permanent for all subsequent steps.
       - name: Prepare R library directory
         run: |
           mkdir -p "$R_LIBS_USER"
           echo "R_LIBS_USER=$R_LIBS_USER" >> $GITHUB_ENV
-          echo "✓ R library at: $R_LIBS_USER"
-
-      - name: Cache R packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.R_LIBS_USER }}
-          key: r-4.4.3-${{ runner.os }}-${{ hashFiles('incremental_fetch.R', 'dashboard.Rmd') }}
-          restore-keys: |
-            r-4.4.3-${{ runner.os }}-
 
       - name: Install R packages
         run: |
@@ -79,51 +67,31 @@ jobs:
             .libPaths(c(lib, .libPaths()))
             options(repos = c(CRAN = "https://cloud.r-project.org"),
                     Ncpus = max(1L, parallel::detectCores() - 1L))
-            waves <- list(
-              base = c("jsonlite","readr","tibble","dplyr","tidyr",
-                       "lubridate","scales","knitr","deSolve"),
-              viz  = c("ggplot2"),
-              docs = c("rmarkdown")
-            )
-            for (wave in names(waves)) {
-              pkgs <- waves[[wave]]
-              need <- pkgs[!pkgs %in% rownames(installed.packages())]
-              if (length(need)) {
-                message("Wave [", wave, "]: installing ", paste(need, collapse = ", "))
-                install.packages(need, lib = lib, dependencies = TRUE)
-              }
-            }
-            required <- unlist(waves, use.names = FALSE)
-            missing  <- required[!required %in% rownames(installed.packages())]
+            pkgs <- c("jsonlite","readr","tibble","dplyr","tidyr",
+                      "lubridate","ggplot2","knitr","rmarkdown","deSolve")
+            need <- pkgs[!pkgs %in% rownames(installed.packages())]
+            if (length(need)) install.packages(need, lib = lib, dependencies = TRUE)
+            missing <- pkgs[!pkgs %in% rownames(installed.packages())]
             if (length(missing)) stop("Missing: ", paste(missing, collapse = ", "))
-            cat("✓ All packages installed in:", lib, "\n")
-            cat("rmarkdown present: ",
-                "rmarkdown" %in% rownames(installed.packages()), "\n")
           '
 
       - name: Run incremental fetch and export JSON
         run: |
           Rscript -e '
             .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            cat("Library in use:", .libPaths()[1], "\n")
             source("incremental_fetch.R")
           '
 
       - name: Verify JSON output
         run: |
           ls -la data/
-          cat data/ebola_data.json | grep -A 8 "case_telemetry" | head -20
+          head -20 data/ebola_data.json
 
       - name: Render dashboard.Rmd
         run: |
           mkdir -p reports
           Rscript -e '
             .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            cat("Library in use:", .libPaths()[1], "\n")
-            if (!requireNamespace("rmarkdown", quietly = TRUE)) {
-              stop("rmarkdown not found. Installed: ",
-                   paste(rownames(installed.packages()), collapse = ", "))
-            }
             rmarkdown::render("dashboard.Rmd",
                               output_file = "reports/dashboard.html",
                               quiet = FALSE)
@@ -134,7 +102,6 @@ jobs:
         run: |
           rm -rf _site
           mkdir -p _site
-
           cp    index.html   _site/
           cp -r css          _site/
           cp -r js           _site/
@@ -143,17 +110,14 @@ jobs:
           cp -r reports      _site/
           cp -r docs         _site/
           touch _site/.nojekyll
-
-          echo "── _site contents ──"
+          echo "── _site tree ──"
           find _site -maxdepth 2 -type f | sort
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_site
-          publish_branch: gh-pages
-          keep_files: false
-          user_name:  'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'Automated update: ${{ github.run_id }}'
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
