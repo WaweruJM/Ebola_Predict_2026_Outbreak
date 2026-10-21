@@ -8,11 +8,10 @@ let DATA = {
     zones: [], sliders: [], primary_parameters: {}, performance: {}
 };
 let charts = {};
-let originalChartData = {}; // Stores baseline data for resetting graphs
+let originalChartData = {};
 
 const $ = (sel) => document.querySelector(sel);
 
-// ---------- UI Components ----------
 function makeCard({ label, value, unit = '', delta = '', trend = '' }) {
     const card = document.createElement('div');
     card.className = 'metric-card';
@@ -59,7 +58,6 @@ function renderSliders() {
 }
 
 function resetSliders() {
-    // 1. Reset the slider UI elements
     DATA.sliders.forEach(s => {
         const input = document.getElementById(`slider-${s.id}`);
         if (input) {
@@ -68,14 +66,12 @@ function resetSliders() {
         }
     });
 
-    // 2. Reset the Predictive Chart to its original state
     const pc = charts.predictiveChart;
     if (pc && originalChartData.predictive) {
         pc.data = JSON.parse(JSON.stringify(originalChartData.predictive));
         pc.update('none');
     }
 
-    // 3. Reset the Coefficients Chart
     const cc = charts.coeffChart;
     if (cc && originalChartData.coeff) {
         cc.data = JSON.parse(JSON.stringify(originalChartData.coeff));
@@ -83,7 +79,6 @@ function resetSliders() {
     }
 }
 
-// ---------- Chart Plugins ----------
 const zoneBandsPlugin = {
     id: 'zoneBands',
     beforeDatasetsDraw(chart, args, opts) {
@@ -131,7 +126,6 @@ const paramLinesPlugin = {
 };
 Chart.register(paramLinesPlugin);
 
-// ---------- Helpers ----------
 function padTail(n = 0) { return new Array(Math.max(0, n || 0)).fill(null); }
 function padHead(len, arr = []) { return new Array(len).fill(null).concat(arr); }
 
@@ -181,7 +175,6 @@ function deepMerge(a, b) {
     return out;
 }
 
-// ---------- Chart Builder ----------
 function buildCharts() {
     const col = $('#chartsColumn');
     col.innerHTML = '';
@@ -195,7 +188,7 @@ function buildCharts() {
         {
             id: 'confirmedChart',
             title: 'Confirmed Cases, Deaths & Recoveries',
-            subtitle: 'Observed series (confirmed only)',
+            subtitle: 'Observed series',
             type: 'line', yTitle: 'Cumulative count', zones: null,
             build: () => ({
                 labels: S.months,
@@ -273,9 +266,7 @@ function buildCharts() {
 
         const ctx = card.querySelector(`#${def.id}`).getContext('2d');
         const opts = chartOptions(def.type, def.yTitle);
-        if (def.zones) {
-            opts.plugins.zoneBands = { zones: DATA.zones };
-        }
+        if (def.zones) opts.plugins.zoneBands = { zones: DATA.zones };
         if (def.id === 'sirPopChart') {
             opts.plugins.paramLines = {
                 lines: [
@@ -292,16 +283,11 @@ function buildCharts() {
             options: opts
         });
 
-        if (def.id === 'predictiveChart') {
-            originalChartData.predictive = JSON.parse(JSON.stringify(charts[def.id].data));
-        }
-        if (def.id === 'coeffChart') {
-            originalChartData.coeff = JSON.parse(JSON.stringify(charts[def.id].data));
-        }
+        if (def.id === 'predictiveChart') originalChartData.predictive = JSON.parse(JSON.stringify(charts[def.id].data));
+        if (def.id === 'coeffChart') originalChartData.coeff = JSON.parse(JSON.stringify(charts[def.id].data));
     });
 }
 
-// ---------- Slider Updates ----------
 function updateCharts() {
     const beta = parseFloat($('#slider-beta')?.value ?? 0.42);
     const gamma = parseFloat($('#slider-gamma')?.value ?? 0.13);
@@ -315,85 +301,9 @@ function updateCharts() {
     if (pc && originalChartData.predictive) {
         const baseFitted = originalChartData.predictive.datasets[1].data;
         const baseProj = originalChartData.predictive.datasets[2].data;
-
         pc.data.datasets[1].data = baseFitted.map(v => v == null ? null : +(v * scale).toFixed(2));
         pc.data.datasets[2].data = baseProj.map(v => v == null ? null : +(v * scale).toFixed(2));
-        
         pc.update('none');
     }
 
-    const cc = charts.coeffChart;
-    if (cc) {
-        cc.data.datasets[0].data = cc.data.datasets[0].data.map(() => +beta.toFixed(3));
-        cc.data.datasets[1].data = cc.data.datasets[1].data.map(() => +gamma.toFixed(3));
-        cc.data.datasets[2].data = cc.data.datasets[2].data.map(() => +mu.toFixed(3));
-        cc.update('none');
-    }
-}
-
-// ---------- Data Loading ----------
-const FALLBACK_DATA = {
-    case_telemetry: [
-        { label: 'Confirmed Cases', value: 0, unit: '', delta: '--', trend: '' },
-        { label: 'Confirmed Deaths', value: 0, unit: '', delta: '--', trend: '' },
-        { label: 'Recovered', value: 0, unit: '', delta: '--', trend: '' },
-        { label: 'Active Cases', value: 0, unit: '', delta: '--', trend: '' },
-        { label: 'Case Fatality Rate', value: 0, unit: '%', delta: '--', trend: '' }
-    ],
-    bio_coefficients: [
-        { label: 'beta', value: 0, unit: '/day', delta: '' },
-        { label: 'gamma', value: 0, unit: '/day', delta: '' },
-        { label: 'mu', value: 0, unit: '/day', delta: '' },
-        { label: 'R0', value: 0, unit: '', delta: '' },
-        { label: 'Policy factor', value: 0, unit: '', delta: '' }
-    ],
-    chart_series: {
-        months: [], confirmed_observed: [], recovered_observed: [], deaths_observed: [],
-        seir_fitted_I: [], projection_dates: [], projection_I: [],
-        sir_I: [], sir_R: [], sir_D: [],
-        coeff_beta: [], coeff_gamma: [], coeff_mu: []
-    },
-    zones: [],
-    sliders: [
-        { id: 'beta', label: 'Transmission Rate (beta)', min: 0.05, max: 1.5, step: 0.01, value: 0.5 },
-        { id: 'gamma', label: 'Recovery Rate (gamma)', min: 0.02, max: 0.5, step: 0.01, value: 0.15 },
-        { id: 'mu', label: 'Mortality Rate (mu)', min: 0.0, max: 0.5, step: 0.01, value: 0.05 },
-        { id: 'zoonotic', label: 'Zoonotic Spillover', min: 0, max: 50, step: 1, value: 12 },
-        { id: 'interv', label: 'Intervention Efficacy', min: 0, max: 100, step: 1, value: 35 }
-    ],
-    primary_parameters: { beta: 0.5, gamma: 0.15, mu: 0.05 },
-    performance: {}
-};
-
-async function loadData() {
-    try {
-        const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        DATA = await res.json();
-    } catch (err) {
-        console.warn('Could not load fresh data. Using fallback.', err);
-        DATA = FALLBACK_DATA;
-    }
-}
-
-// ---------- Initialization ----------
-async function init() {
-    await loadData();
-    renderCards('caseTelemetryCards', DATA.case_telemetry);
-    renderCards('bioCoeffCards', DATA.bio_coefficients);
-    renderSliders();
-    buildCharts();
-    $('#resetBtn').addEventListener('click', resetSliders);
-    
-    if (DATA.generated_at) {
-        const stamp = document.createElement('span');
-        stamp.style.fontSize = '0.75rem';
-        stamp.style.marginLeft = '12px';
-        stamp.style.opacity = '0.7';
-        stamp.textContent = `Last refreshed: ${new Date(DATA.generated_at).toLocaleString()}`;
-        const footer = document.querySelector('.portal-footer');
-        if (footer) footer.appendChild(stamp);
-    }
-}
-
-document.addEventListener('DOMContentLoaded', init);
+    const cc = charts.co
