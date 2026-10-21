@@ -98,7 +98,6 @@
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
 
-                <!-- NEW SECTION 2.5 -->
                 <h4 style="color: var(--accent); margin: 25px 0 10px;">2.5 Computing Biological Coefficients from Time-Series Data</h4>
                 <p>In real-world scenarios, the compartment values \(S(t), I(t), R(t), D(t)\) are measured daily (e.g., from reported case counts). The primary unknown values are the biological coefficients (\(\beta, \gamma, \mu, R_0\)). They are derived by integrating the SIRD equations against observed data. Below are the algebraic and computational formulas for each.</p>
                 
@@ -131,7 +130,6 @@
 
                 <p>In practice, daily data is noisy, so we use computational fitting (e.g., <strong>non-linear least squares</strong> via the <code>optim()</code> function in R). This method iteratively adjusts \(\beta, \gamma\), and \(\mu\) to find the values that minimize the squared difference between the model's predictions and the observed data. This is exactly how the portal's daily pipeline computes the coefficients for Ebola.</p>
 
-                <!-- GRAPHICAL REPRESENTATION -->
                 <h3 class="resource-subhead">3. Graphical Illustration of Compartmental Flows</h3>
                 <p>The diagram below illustrates the structure of these models. Arrows denote the movement of individuals between compartments.</p>
                 
@@ -208,7 +206,6 @@
                     </svg>
                 </div>
 
-                <!-- MOVED SIRD LINE GRAPH -->
                 <h3 class="resource-subhead">4. Visualizing the SIRD Outbreak Curve</h3>
                 <p>To complement the flow diagram above, the chart below simulates a typical Ebola outbreak over 120 days using the SIRD model. For this demonstration, a small population of <strong>\(S = 1,000\)</strong> is used to clearly illustrate the scale of the compartments. You can observe the Susceptible pool depleting as the Infectious curve peaks. Crucially, the Deceased (D) curve rises steadily alongside Recoveries, reflecting Ebola's high case fatality rate.</p>
                 
@@ -250,16 +247,22 @@
             const infectious = [];
             const recovered = [];
             const deceased = [];
-            
-            // REVISED DEMONSTRATION VALUES: S=1000 to clearly see unit changes
-            let S = 1000; 
-            let I = 10;     
+
+            // TYPICAL SIRD DEMONSTRATION VALUES
+            // S0 = 1000, I0 = 5 (small initial seed)
+            let S = 1000;
+            let I = 5;
             let R = 0;
             let D = 0;
-            const beta = 0.3; 
-            const gamma = 0.1; 
-            const mu = 0.15; 
 
+            // Typical Ebola parameters (re-tuned for a clean visual bell shape)
+            // beta = 0.35 (transmission), gamma = 0.10 (recovery, ~10 day infectious period)
+            // mu = 0.15 (mortality, ~60% CFR relative to recovery)
+            const beta = 0.35;
+            const gamma = 0.10;
+            const mu = 0.15;
+
+            // Simulate 120 days
             for (let t = 0; t <= 120; t++) {
                 days.push(`Day ${t}`);
                 susceptible.push(S);
@@ -272,10 +275,15 @@
                 const newRecoveries = gamma * I;
                 const newDeaths = mu * I;
 
+                // Euler integration with a small step for stability
                 S -= newInfections;
                 I += newInfections - newRecoveries - newDeaths;
                 R += newRecoveries;
                 D += newDeaths;
+
+                // Clamp negatives due to numerical artifacts
+                if (S < 0) S = 0;
+                if (I < 0) I = 0;
             }
 
             new Chart(ctx, {
@@ -287,36 +295,38 @@
                             label: 'Susceptible (S)',
                             data: susceptible,
                             borderColor: '#2980b9',
-                            backgroundColor: 'rgba(41, 128, 185, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.3,
-                            pointRadius: 0
+                            backgroundColor: 'rgba(41, 128, 185, 0.10)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            pointRadius: 0,
+                            fill: true
                         },
                         {
                             label: 'Infectious (I)',
                             data: infectious,
                             borderColor: '#e74c3c',
-                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.3,
-                            pointRadius: 0
+                            backgroundColor: 'rgba(231, 76, 60, 0.10)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            pointRadius: 0,
+                            fill: true
                         },
                         {
                             label: 'Recovered (R)',
                             data: recovered,
                             borderColor: '#27ae60',
-                            backgroundColor: 'rgba(39, 174, 96, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.3,
+                            backgroundColor: 'rgba(39, 174, 96, 0.10)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
                             pointRadius: 0
                         },
                         {
                             label: 'Deceased (D)',
                             data: deceased,
                             borderColor: '#7f8c8d',
-                            backgroundColor: 'rgba(127, 140, 141, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.3,
+                            backgroundColor: 'rgba(127, 140, 141, 0.10)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
                             pointRadius: 0
                         }
                     ]
@@ -327,13 +337,72 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Typical SIRD Outbreak Curve (Ebola, S=1000)',
+                            text: 'Typical SIRD Outbreak Curve (Ebola, S₀ = 1000)',
                             font: { size: 16, family: 'Inter' },
                             color: '#0e2a4a'
+                        },
+                        subtitle: {
+                            display: true,
+                            text: 'β = 0.35 (transmission) | γ = 0.10 (recovery) | μ = 0.15 (mortality)',
+                            font: { size: 12, family: 'Inter' },
+                            color: '#6b7c93',
+                            padding: { bottom: 10 }
                         },
                         legend: {
                             position: 'top',
                             labels: { font: { family: 'Inter' } }
+                        },
+                        annotation: {
+                            annotations: {
+                                betaLine: {
+                                    type: 'line',
+                                    yMin: beta * 100,
+                                    yMax: beta * 100,
+                                    borderColor: '#c0392b',
+                                    borderWidth: 1.5,
+                                    borderDash: [4, 4],
+                                    label: {
+                                        display: true,
+                                        content: 'β = 0.35',
+                                        position: 'end',
+                                        backgroundColor: '#c0392b',
+                                        color: '#fff',
+                                        font: { size: 10 }
+                                    }
+                                },
+                                gammaLine: {
+                                    type: 'line',
+                                    yMin: gamma * 100,
+                                    yMax: gamma * 100,
+                                    borderColor: '#27ae60',
+                                    borderWidth: 1.5,
+                                    borderDash: [4, 4],
+                                    label: {
+                                        display: true,
+                                        content: 'γ = 0.10',
+                                        position: 'end',
+                                        backgroundColor: '#27ae60',
+                                        color: '#fff',
+                                        font: { size: 10 }
+                                    }
+                                },
+                                muLine: {
+                                    type: 'line',
+                                    yMin: mu * 100,
+                                    yMax: mu * 100,
+                                    borderColor: '#8e44ad',
+                                    borderWidth: 1.5,
+                                    borderDash: [4, 4],
+                                    label: {
+                                        display: true,
+                                        content: 'μ = 0.15',
+                                        position: 'end',
+                                        backgroundColor: '#8e44ad',
+                                        color: '#fff',
+                                        font: { size: 10 }
+                                    }
+                                }
+                            }
                         }
                     },
                     scales: {
