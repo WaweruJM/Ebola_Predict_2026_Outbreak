@@ -55,18 +55,18 @@
                 <p>To build a model, we must define the biological parameters that govern how individuals move between compartments. These coefficients are critical and must be estimated from real-world data.</p>
                 <ul class="resource-list">
                     <li><strong>Contact Rate (\(c\)):</strong> The average number of contacts an infectious individual makes per unit time (e.g., per day).</li>
-                    <li><strong>Probability of Transmission given a Contact (\(\tau\)):</strong> The likelihood that a contact between an infectious and susceptible individual results in transmission. This depends on the pathogen and the nature of the contact.</li>
+                    <li><strong>Probability of Transmission given a Contact (\(\tau\)):</strong> The likelihood that a contact between an infectious and susceptible individual results in transmission.</li>
                     <li><strong>Transmission Rate (\(\beta\)):</strong> The effective contact rate, defined as \(\beta = c \cdot \tau\). It represents the rate at which susceptible individuals become infectious.</li>
-                    <li><strong>Recovery Rate (\(\gamma\)):</strong> The rate at which infectious individuals recover and move to the Recovered compartment. It is the inverse of the mean infectious period (\(1/D\)).</li>
+                    <li><strong>Recovery Rate (\(\gamma\)):</strong> The rate at which infectious individuals recover. It is the inverse of the mean infectious period (\(1/D\)).</li>
                     <li><strong>Mortality Rate (\(\mu\)):</strong> The rate at which infectious individuals die from the disease and move to the Deceased compartment.</li>
-                    <li><strong>Basic Reproduction Number (\(R_0\)):</strong> The expected number of secondary cases caused by one infectious individual in a completely susceptible population. For a SIR model with mortality, \(R_0 = \beta / (\gamma + \mu)\). If \(R_0 > 1\), the outbreak grows; if \(R_0 < 1\), it shrinks.</li>
+                    <li><strong>Basic Reproduction Number (\(R_0\)):</strong> The expected number of secondary cases caused by one infectious individual in a completely susceptible population. For a SIR model with mortality, \(R_0 = \beta / (\gamma + \mu)\).</li>
                 </ul>
 
                 <h3 class="resource-subhead">2. Compartmental Models and their Equations</h3>
                 <p>Depending on the disease and the questions being asked, different compartmental structures are used. Below are the most common, applied to Ebola.</p>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.1 SIS Model (Susceptible – Infectious – Susceptible)</h4>
-                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery. Not typically applicable to Ebola, which confers immunity.</p>
+                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery. Not typically applicable to Ebola.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} + \gamma I \)</li>
                     <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
@@ -98,6 +98,7 @@
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
 
+                <!-- NEW SECTION 2.5 -->
                 <h4 style="color: var(--accent); margin: 25px 0 10px;">2.5 Computing Biological Coefficients from Time-Series Data</h4>
                 <p>In real-world scenarios, the compartment values \(S(t), I(t), R(t), D(t)\) are measured daily (e.g., from reported case counts). The primary unknown values are the biological coefficients (\(\beta, \gamma, \mu, R_0\)). They are derived by integrating the SIRD equations against observed data. Below are the algebraic and computational formulas for each.</p>
                 
@@ -130,6 +131,7 @@
 
                 <p>In practice, daily data is noisy, so we use computational fitting (e.g., <strong>non-linear least squares</strong> via the <code>optim()</code> function in R). This method iteratively adjusts \(\beta, \gamma\), and \(\mu\) to find the values that minimize the squared difference between the model's predictions and the observed data. This is exactly how the portal's daily pipeline computes the coefficients for Ebola.</p>
 
+                <!-- GRAPHICAL REPRESENTATION -->
                 <h3 class="resource-subhead">3. Graphical Illustration of Compartmental Flows</h3>
                 <p>The diagram below illustrates the structure of these models. Arrows denote the movement of individuals between compartments.</p>
                 
@@ -206,6 +208,7 @@
                     </svg>
                 </div>
 
+                <!-- MOVED SIRD LINE GRAPH -->
                 <h3 class="resource-subhead">4. Visualizing the SIRD Outbreak Curve</h3>
                 <p>To complement the flow diagram above, the chart below simulates a typical Ebola outbreak over 120 days using the SIRD model. For this demonstration, a small population of <strong>\(S = 1,000\)</strong> is used to clearly illustrate the scale of the compartments. You can observe the Susceptible pool depleting as the Infectious curve peaks. Crucially, the Deceased (D) curve rises steadily alongside Recoveries, reflecting Ebola's high case fatality rate.</p>
                 
@@ -237,6 +240,7 @@
         </div>
     </footer>
 
+    <!-- Script to render the SIRD Graph -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const ctx = document.getElementById('sirdChart').getContext('2d');
@@ -247,6 +251,7 @@
             const recovered = [];
             const deceased = [];
             
+            // REVISED DEMONSTRATION VALUES: S=1000 to clearly see unit changes
             let S = 1000; 
             let I = 10;     
             let R = 0;
