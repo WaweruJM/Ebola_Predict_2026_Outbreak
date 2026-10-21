@@ -62,25 +62,18 @@ train_idx <- 1:train_n
 train_obs <- outbreak_df$confirmed[train_idx]
 train_t   <- 0:(train_n - 1)
 
-# Objective: minimize SSE between observed cumulative cases and model (I+R+D)
 sir_objective <- function(par) {
-  beta  <- exp(par[1])
-  gamma <- exp(par[2])
-  i0    <- exp(par[3])
-  mu    <- 0.05 # Fixed mortality
-  
+  beta  <- exp(par[1]); gamma <- exp(par[2]); i0 <- exp(par[3]); mu <- 0.05
   state0 <- c(S = POPULATION_AT_RISK - i0, I = i0, R = 0, D = 0)
   out <- tryCatch(
     as.data.frame(ode(state0, train_t, sir_model, c(beta=beta, gamma=gamma, mu=mu))),
     error = function(e) NULL
   )
   if (is.null(out)) return(1e12)
-  
   predicted_cum <- out$I + out$R + out$D
   sum((predicted_cum - train_obs)^2)
 }
 
-# Initial guess: beta=0.5, gamma=0.1, I0=10
 fit <- optim(
   par = log(c(0.5, 0.1, 10)),
   fn = sir_objective,
@@ -96,8 +89,6 @@ I0_fit    <- exp(fit$par[3])
 mu_est    <- 0.05
 R0_est    <- beta_est / (gamma_est + mu_est)
 
-message(sprintf("  Fitted: beta=%.4f, gamma=%.4f, R0=%.3f", beta_est, gamma_est, R0_est))
-
 # ---------- STEP 5: TESTING & FULL FIT ----------
 message("STEP 5 — Evaluating on Full Window")
 full_t <- 0:(n_obs - 1)
@@ -107,7 +98,6 @@ sir_full <- as.data.frame(ode(state0_full, full_t, sir_model, c(beta=beta_est, g
 predicted_I <- sir_full$I + sir_full$R + sir_full$D
 observed_I  <- outbreak_df$confirmed
 
-# Performance
 perf_metrics <- function(obs, pred) {
   res <- obs - pred
   list(
@@ -123,8 +113,6 @@ overall    <- perf_metrics(observed_I, predicted_I)
 # ---------- STEP 6: PROJECTION (Anchored to Last Observed State) ----------
 message("STEP 6 — 14-Day Projection")
 proj_t <- n_obs - 1 + 0:PROJECTION_DAYS
-last_row <- tail(sir_full, 1)
-# Anchor to observed state so projection starts where data ends
 anchor_state <- c(
   S = POPULATION_AT_RISK - tail(outbreak_df$confirmed, 1),
   I = tail(outbreak_df$active_cases, 1),
@@ -170,7 +158,7 @@ chart_series <- list(
   recovered_observed   = ts$recovered,
   deaths_observed      = ts$confirmed_deaths,
   seir_fitted_I        = predicted_I[obs_idx],
-  projection_dates     = format(last_date + 1:PROJECTION_DAYS, "%Y-%m-%d"),
+  projection_dates     = format(last_date + 1:PROJECTION_DAYS, "%Y-%m-%d"), # Next 14 days
   projection_I         = proj_cum[-1],
   projection_cum       = cumsum(c(tail(cumsum(predicted_I), 1), proj_cum[-1]))[-1],
   sir_I                = sir_full$I[obs_idx],
@@ -198,7 +186,7 @@ sliders <- list(
 
 payload <- list(
   generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  last_data_date = format(last_date, "%Y-%m-%d"),
+  last_data_date = format(last_date, "%Y-%m-%d"), # Key addition for frontend
   population_at_risk = POPULATION_AT_RISK,
   projection_days = PROJECTION_DAYS,
   primary_parameters = list(beta = beta_est, gamma = gamma_est, mu = mu_est, R0 = R0_est, growth_rate = beta_est - gamma_est - mu_est),
