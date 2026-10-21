@@ -65,4 +65,66 @@ sir_model &lt;- function(time, state, parms) {
 }
 
 state0 &lt;- c(S = 19999990, I = 10, R = 0, D = 0)
-params &lt;- c(beta = 0
+params &lt;- c(beta = 0.5, gamma = 0.15, mu = 0.05)
+times  &lt;- 0:100
+out    &lt;- ode(state0, times, sir_model, params)</pre>
+                <p>The result is a data frame with one row per time point and one column per compartment.</p>
+                <h3 class="resource-subhead">Choosing the Right Solver</h3>
+                <ul class="resource-list">
+                    <li><strong>lsoda</strong> — the default. Auto-switches between stiff and non-stiff methods.</li>
+                    <li><strong>vode</strong> — variable-coefficient solver, good for long integrations.</li>
+                    <li><strong>ode45</strong> — classic non-stiff Runge–Kutta.</li>
+                    <li><strong>radau</strong> — implicit solver for very stiff systems.</li>
+                </ul>
+                <h3 class="resource-subhead">Calibration with optim()</h3>
+                <p><code>deSolve</code> only <em>solves</em> an ODE once you provide parameters. To estimate the parameters from data, we pair it with <code>optim()</code>:</p>
+                <pre class="resource-formula">
+sir_objective &lt;- function(par) {
+  beta  &lt;- exp(par[1])
+  gamma &lt;- exp(par[2])
+  i0    &lt;- exp(par[3])
+  state0 &lt;- c(S = 2e7 - i0, I = i0, R = 0, D = 0)
+  out &lt;- ode(state0, times, sir_model,
+             c(beta = beta, gamma = gamma, mu = 0.05))
+  predicted &lt;- out$I + out$R + out$D
+  sum((predicted - observed)^2)
+}
+
+fit &lt;- optim(
+  par    = log(c(0.5, 0.1, 10)),
+  fn     = sir_objective,
+  method = "L-BFGS-B",
+  lower  = log(c(0.01, 0.01, 1)),
+  upper  = log(c(5.0,  1.0,  1000))
+)</pre>
+                <p>The logarithmic transformation ensures that <code>optim()</code> always proposes <em>positive</em> parameter values — a requirement for all epidemiological rates.</p>
+                <h3 class="resource-subhead">Full-Fit and Projection Flow</h3>
+                <ol class="resource-list">
+                    <li>Fit the model to the <em>training window</em> using <code>optim()</code>.</li>
+                    <li>Solve the ODE over the <em>full observed window</em> to evaluate fit against the test data.</li>
+                    <li>Anchor a new solve at the <em>last observed state</em> and integrate forward for the projection horizon.</li>
+                </ol>
+                <h3 class="resource-subhead">Practical Tips</h3>
+                <ul class="resource-list">
+                    <li>Always inspect the return object — if <code>ode()</code> silently returns <code>NA</code> rows, the parameters were too extreme.</li>
+                    <li>Wrap the objective in <code>tryCatch()</code> so a failed integration returns a large penalty instead of crashing the fit.</li>
+                    <li>Bound the parameters tightly to avoid unphysical estimates.</li>
+                    <li>Normalise the sum of squared errors by the number of observations so RMSE and MAE are interpretable.</li>
+                </ul>
+                <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="portal-footer">
+        <div class="footer-links">
+            <span>© 2026 Ebola Outbreak Analysis Portal</span>
+            <span class="footer-sep">|</span>
+            <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
+            <span class="footer-sep">|</span>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+        </div>
+    </footer>
+
+</body>
+</html>
