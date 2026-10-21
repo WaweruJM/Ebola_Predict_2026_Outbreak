@@ -6,6 +6,10 @@
     <title>SIR Model of Infectious Diseases — Ebola Portal</title>
     <link rel="stylesheet" href="../css/style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Load Chart.js for the SIRD line graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
     <!-- Load MathJax for proper equation rendering -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -95,13 +99,13 @@
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
 
-                <!-- GRAPHICAL REPRESENTATION OF COMPARTMENTAL MODELS -->
+                <!-- REVISED GRAPHICAL REPRESENTATION -->
                 <h3 class="resource-subhead">3. Graphical Illustration of Compartmental Flows</h3>
                 <p>The diagram below illustrates the structure of these models. Arrows denote the movement of individuals between compartments.</p>
                 
-                <div style="text-align: center; margin: 20px 0; background: #fff; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #ccc;">
-                    <!-- Inline SVG to draw the compartmental models -->
-                    <svg viewBox="0 0 800 600" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+                <div style="text-align: center; margin: 20px 0; background: #fff; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #ccc; overflow: visible;">
+                    <!-- Expanded viewBox to 800x720 to fit SIRD fully -->
+                    <svg viewBox="0 0 800 720" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#333" />
@@ -157,14 +161,19 @@
                         <text x="300" y="550" text-anchor="middle" fill="white" font-weight="bold">I</text>
                         <rect x="450" y="520" width="100" height="50" rx="5" fill="#27ae60" />
                         <text x="500" y="550" text-anchor="middle" fill="white" font-weight="bold">R</text>
-                        <rect x="450" y="620" width="100" height="50" rx="5" fill="#7f8c8d" />
-                        <text x="500" y="650" text-anchor="middle" fill="white" font-weight="bold">D</text>
+                        
+                        <!-- D Compartment (Now fully visible) -->
+                        <rect x="450" y="640" width="100" height="50" rx="5" fill="#7f8c8d" />
+                        <text x="500" y="670" text-anchor="middle" fill="white" font-weight="bold">D</text>
+                        
                         <line x1="150" y1="535" x2="245" y2="535" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
                         <text x="200" y="525" text-anchor="middle" font-size="12">β</text>
                         <line x1="350" y1="535" x2="445" y2="535" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
                         <text x="400" y="525" text-anchor="middle" font-size="12">γ</text>
-                        <line x1="350" y1="555" x2="445" y2="625" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
-                        <text x="390" y="600" text-anchor="middle" font-size="12">μ</text>
+                        
+                        <!-- Arrow to D compartment -->
+                        <line x1="350" y1="555" x2="445" y2="650" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="390" y="615" text-anchor="middle" font-size="12">μ</text>
                     </svg>
                 </div>
 
@@ -179,7 +188,15 @@
                 <h3 class="resource-subhead">5. Summary and Relevance to Ebola</h3>
                 <p>For the Ebola outbreak, the SIRD or SEIR models are the most appropriate. They capture the high mortality rate (D) and the significant incubation period (E). The daily computational pipeline of this portal uses these structures to fit the observed data and generate real-time, 14-day forecasts. This provides health-policy leaders with the evidence base needed to plan and evaluate response strategies.</p>
 
-                <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
+                <!-- NEW SECTION: SIRD LINE GRAPH -->
+                <h3 class="resource-subhead">6. Visualizing the SIRD Outbreak Curve</h3>
+                <p>The chart below simulates a typical Ebola outbreak (SIRD model) over 120 days. The Susceptible population shrinks as the Infectious population peaks and then falls. The Recovered population grows, but so does the Deceased population, reflecting the high case fatality rate of Ebola.</p>
+                
+                <div class="chart-container" style="position: relative; height: 400px; width: 100%; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccc; margin-top: 15px;">
+                    <canvas id="sirdChart"></canvas>
+                </div>
+
+                <p class="resource-back" style="margin-top: 40px;"><a href="../index.html">← Back to Portal</a></p>
             </div>
         </section>
     </main>
@@ -192,5 +209,117 @@
         </div>
     </footer>
 
+    <!-- Script to render the SIRD Graph -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const ctx = document.getElementById('sirdChart').getContext('2d');
+            
+            // Generate mock data for a typical SIRD curve
+            const days = [];
+            const susceptible = [];
+            const infectious = [];
+            const recovered = [];
+            const deceased = [];
+            
+            let S = 100000; // Total population
+            let I = 10;     // Initial cases
+            let R = 0;
+            let D = 0;
+            const beta = 0.3; // Transmission rate
+            const gamma = 0.1; // Recovery rate
+            const mu = 0.15; // Mortality rate (Ebola-specific)
+
+            for (let t = 0; t <= 120; t++) {
+                days.push(`Day ${t}`);
+                susceptible.push(S);
+                infectious.push(I);
+                recovered.push(R);
+                deceased.push(D);
+
+                // Euler integration of SIRD equations
+                const N = S + I + R + D;
+                const newInfections = (beta * S * I) / N;
+                const newRecoveries = gamma * I;
+                const newDeaths = mu * I;
+
+                S -= newInfections;
+                I += newInfections - newRecoveries - newDeaths;
+                R += newRecoveries;
+                D += newDeaths;
+            }
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: days,
+                    datasets: [
+                        {
+                            label: 'Susceptible (S)',
+                            data: susceptible,
+                            borderColor: '#2980b9',
+                            backgroundColor: 'rgba(41, 128, 185, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Infectious (I)',
+                            data: infectious,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Recovered (R)',
+                            data: recovered,
+                            borderColor: '#27ae60',
+                            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Deceased (D)',
+                            data: deceased,
+                            borderColor: '#7f8c8d',
+                            backgroundColor: 'rgba(127, 140, 141, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Typical SIRD Outbreak Curve (Ebola)',
+                            font: { size: 16, family: 'Inter' },
+                            color: '#0e2a4a'
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: { font: { family: 'Inter' } }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Time (Days)', font: { weight: 'bold', family: 'Inter' } },
+                            ticks: { maxTicksLimit: 12, font: { family: 'Inter' } }
+                        },
+                        y: {
+                            title: { display: true, text: 'Number of Individuals', font: { weight: 'bold', family: 'Inter' } },
+                            beginAtZero: true,
+                            font: { family: 'Inter' }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
 </body>
 </html>
