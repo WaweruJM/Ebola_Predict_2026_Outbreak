@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analysis Workflow in R — Ebola Portal</title>
-    <link rel="stylesheet" href="../css/style.css?v=8">
+    <link rel="stylesheet" href="../css/style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
-<body style="--bg-image: url('../assets/ebola-theme.jpg');">
+<body style="--bg-image: url('../assets/background.jpg');">
 
     <div class="top-marquee">
         <div class="marquee-track">
@@ -23,7 +26,7 @@
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
-                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="../assets/background.jpg" alt="Ebola virus">
             </div>
             <div class="header-title-block">
                 <h1 class="portal-title">Analysis Workflow in R</h1>
@@ -33,7 +36,7 @@
                 </div>
             </div>
             <div class="virus-icon right-virus" aria-hidden="true">
-                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="../assets/background.jpg" alt="Ebola virus">
             </div>
         </div>
     </header>
@@ -42,37 +45,77 @@
         <section class="card-row">
             <h2 class="row-heading">The Daily Pipeline, Step by Step</h2>
             <div class="resource-body">
-                <p>This portal is not manually updated. Every day at 05:00 UTC, a GitHub Actions workflow pulls the latest upstream data, runs the SIR model, exports a JSON file, renders an R Markdown report, and publishes the whole site to GitHub Pages. Here is the entire workflow explained.</p>
-                <h3 class="resource-subhead">Step 1 — Data Preparation</h3>
-                <p>The upstream repository (<code>webbegole/ebola-bundibugyo-tracker-2026</code>) publishes a CSV of daily case reports. The workflow clones that repository and copies <code>data/timeseries.csv</code> into the workspace.</p>
-                <h3 class="resource-subhead">Step 2 — Data Wrangling</h3>
+                
+                <p>This portal is not manually updated. Every day at 05:00 UTC, an automated GitHub Actions workflow pulls the latest upstream data, runs a complete SIRD analysis, writes a JSON file consumed by the front-end, and deploys the whole site to GitHub Pages. This document explains every step and the statistical reasoning behind it.</p>
+
+                <h3 class="resource-subhead">Step 1 — Data Acquisition</h3>
+                <p>The upstream repository (<code>webbegole/ebola-bundibugyo-tracker-2026</code>) maintains a CSV of daily case reports. The workflow clones that repository to a temporary folder and copies <code>data/timeseries.csv</code> into the working directory. This guarantees that every analysis starts from the exact same data snapshot that other researchers can verify.</p>
+                <p>The columns used are:</p>
                 <ul class="resource-list">
-                    <li>Parses dates unambiguously.</li>
-                    <li>Normalises column names.</li>
-                    <li>Removes duplicate daily rows.</li>
-                    <li>Computes derived columns: active cases, case fatality rate, daily incidence.</li>
+                    <li><code>report_date</code> — the calendar date of the report.</li>
+                    <li><code>confirmed_global</code> — cumulative confirmed cases.</li>
+                    <li><code>confirmed_deaths_global</code> — cumulative confirmed deaths.</li>
+                    <li><code>recovered_global</code> — cumulative recoveries.</li>
                 </ul>
-                <p>Only <strong>confirmed cases</strong> are used in modelling. Suspected cases are excluded because their reporting is far more variable.</p>
+
+                <h3 class="resource-subhead">Step 2 — Data Wrangling and Quality Control</h3>
+                <p>The raw CSV is cleaned to ensure that downstream modelling is not contaminated by duplicates or missing values:</p>
+                <ul class="resource-list">
+                    <li><strong>Date parsing</strong> — all dates are coerced to R's <code>Date</code> type with a common format.</li>
+                    <li><strong>Column normalization</strong> — names are lowercased and standardised.</li>
+                    <li><strong>Duplicate removal</strong> — when the same date appears multiple times, the row with the most recent <code>source_timestamp</code> is kept.</li>
+                    <li><strong>Derived columns</strong> — the model computes active cases (confirmed − deaths − recovered), CFR (100 × deaths / confirmed), and daily incidence (the difference in cumulative cases day-over-day).</li>
+                </ul>
+                <p>Only <strong>confirmed</strong> cases are modelled. Suspected cases are excluded because reporting practices for suspected cases vary widely between sources, which would introduce systematic bias into the coefficient estimates.</p>
+
                 <h3 class="resource-subhead">Step 3 — Parameter Estimation</h3>
-                <p>The SIR parameters (β, γ, μ) are estimated by <strong>non-linear least squares</strong>. The objective function is:</p>
-                <pre class="resource-formula">SSE(β, γ, I₀) = Σ [observed_cumulative(t) − predicted_cumulative(t)]²</pre>
-                <p>where the model's cumulative output is <code>I(t) + R(t) + D(t)</code>. The optimisation uses <code>optim(method = "L-BFGS-B")</code> with logarithmic reparameterisation to enforce positivity and box constraints to prevent impossible estimates.</p>
+                <p>The three biological coefficients — transmission (\(\beta\)), recovery (\(\gamma\)), and mortality (\(\mu\)) — are estimated by <strong>non-linear least squares</strong>. The objective function is:</p>
+                <pre class="resource-formula">
+SSE(β, γ, I₀) = Σ [observed_cumulative(t) − predicted_cumulative(t)]²
+                </pre>
+                <p>where the model's cumulative output is <code>I(t) + R(t) + D(t)</code>. The optimizer is <code>optim()</code> with the <code>L-BFGS-B</code> method, which allows box constraints on the parameters. Log-reparameterization guarantees that all proposed values are positive.</p>
+                <p>The fitted coefficients in the latest run are written to the JSON file and displayed in the "Biological Coefficients" cards of the portal.</p>
+
                 <h3 class="resource-subhead">Step 4 — Train / Test Split</h3>
+                <p>The observation window is split chronologically:</p>
                 <ul class="resource-list">
-                    <li><strong>Training (first 80 %):</strong> Used to fit β, γ, and I₀.</li>
-                    <li><strong>Testing (last 20 %):</strong> Held out entirely. The fitted model is evaluated on this window to measure predictive skill on data it has never seen.</li>
+                    <li><strong>Training window (first 80%):</strong> used to fit \(\beta, \gamma, \mu\) and the initial infectious count \(I_0\).</li>
+                    <li><strong>Test window (last 20%):</strong> held out entirely. The fitted model is evaluated on this window to measure predictive skill on data it has never seen.</li>
                 </ul>
-                <h3 class="resource-subhead">Step 5 — Model Performance</h3>
+                <p>This split is essential. A model that fits only its training data is meaningless. The test window is the closest available proxy for "would this model have predicted the near future correctly?" — which is the primary use case in a real outbreak response.</p>
+
+                <h3 class="resource-subhead">Step 5 — Statistical Validation</h3>
+                <p>Three validation metrics are computed on both windows:</p>
                 <ul class="resource-list">
-                    <li><strong>RMSE</strong> — Root Mean Squared Error.</li>
-                    <li><strong>MAE</strong> — Mean Absolute Error.</li>
-                    <li><strong>R²</strong> — Coefficient of determination.</li>
+                    <li><strong>RMSE</strong> — Root Mean Squared Error. Penalises large errors; reported in the same units as the case counts.</li>
+                    <li><strong>MAE</strong> — Mean Absolute Error. Average absolute deviation; easier to interpret for non-specialists.</li>
+                    <li><strong>R²</strong> — Coefficient of determination. Fraction of variance explained; 1 is perfect, 0 is no better than the mean, and <em>negative values mean the model is worse than predicting a constant</em>.</li>
                 </ul>
+                <p>These metrics are displayed in the "Model Performance" box on the predictive chart, so readers can judge for themselves how much confidence to place in the forecast.</p>
+
                 <h3 class="resource-subhead">Step 6 — Projection</h3>
-                <p>Once parameters are estimated, the ODE system is re-anchored at the state of the last observation and integrated forward for <strong>14 days</strong>.</p>
-                <h3 class="resource-subhead">Step 7 — Export and Deploy</h3>
-                <p>The script writes <code>data/ebola_data.json</code>. The R Markdown report is rendered to <code>reports/dashboard.html</code>. The workflow assembles the deployable site and publishes it to the <code>gh-pages</code> branch.</p>
+                <p>Once parameters are estimated, the SIRD system is re-anchored at the state of the last observation and integrated forward for 14 days. Anchoring is critical: without it, the projection can jump discontinuously at the boundary between data and forecast.</p>
+                <p>The projected curve is therefore guaranteed to begin exactly where the observed curve ends — a small but crucial detail that distinguishes a professionally presented forecast from an unreliable one.</p>
+
+                <h3 class="resource-subhead">Step 7 — Report and Deployment</h3>
+                <p>The analysis produces three artefacts:</p>
+                <ul class="resource-list">
+                    <li><code>data/ebola_data.json</code> — structured output consumed by the portal's interactive charts.</li>
+                    <li><code>reports/dashboard.html</code> — a self-contained R Markdown report with all tables and static charts.</li>
+                    <li><code>data_cache.csv</code> — a cleaned snapshot of the data, committed for reproducibility.</li>
+                </ul>
+                <p>The GitHub Actions workflow then assembles all files into <code>_site/</code> and publishes the result to GitHub Pages. The whole process is automatic and runs daily.</p>
+
+                <h3 class="resource-subhead">Step 8 — Reproducibility Guarantees</h3>
+                <ul class="resource-list">
+                    <li>The upstream data snapshot is fetched fresh every run.</li>
+                    <li>R packages are installed from a locked, cached library to avoid version drift.</li>
+                    <li>The JSON output is deterministic given the same input CSV.</li>
+                    <li>Every artefact is versioned in the repository history, so any analysis can be audited later.</li>
+                </ul>
+
                 <h3 class="resource-subhead">How to Reproduce Locally</h3>
+                <p>The entire pipeline can be reproduced on any machine with R installed:</p>
                 <pre class="resource-formula">
 # 1. Fetch the latest upstream data
 git clone https://github.com/webbegole/ebola-bundibugyo-tracker-2026
@@ -81,11 +124,24 @@ cp ebola-bundibugyo-tracker-2026/data/timeseries.csv ./downloaded_timeseries.csv
 # 2. Run the analysis
 Rscript incremental_fetch.R
 
-# 3. Render the report
-Rscript -e 'rmarkdown::render("dashboard.Rmd", output_file = "reports/dashboard.html")'
+# 3. Render the R Markdown report
+Rscript -e 'rmarkdown::render("dashboard.Rmd", 
+            output_file = "reports/dashboard.html")'
 
-# 4. Serve the portal
-python3 -m http.server 8000</pre>
+# 4. Serve the portal locally
+python3 -m http.server 8000
+                </pre>
+                <p>Then open <code>http://localhost:8000</code> in a browser to see the same site that GitHub Pages hosts.</p>
+
+                <h3 class="resource-subhead">Why This Workflow Matters</h3>
+                <p>In an Ebola outbreak, the value of a model is not in its elegance but in its <strong>timeliness and reliability</strong>. By automating the entire chain — data ingestion, cleaning, fitting, validation, projection, and publication — this pipeline ensures that:</p>
+                <ul class="resource-list">
+                    <li>The portal always shows the most recent data.</li>
+                    <li>The model is refitted every day to the newest observations.</li>
+                    <li>The forecasts and their performance metrics are always transparent.</li>
+                    <li>Every number displayed can be traced back to a specific code path and a specific data snapshot.</li>
+                </ul>
+
                 <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
             </div>
         </section>
@@ -93,11 +149,9 @@ python3 -m http.server 8000</pre>
 
     <footer class="portal-footer">
         <div class="footer-links">
-            <span>© 2026 Ebola Outbreak Analysis Portal</span>
-            <span class="footer-sep">|</span>
             <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
-            <span class="footer-sep">|</span>
-            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare Experience through Technology</a>
+            <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
         </div>
     </footer>
 
