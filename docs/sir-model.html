@@ -7,7 +7,9 @@
     <link rel="stylesheet" href="../css/style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
+    <!-- Chart.js for the SIRD line graph -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- MathJax for LaTeX equations -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
@@ -64,14 +66,14 @@
                 <p>Depending on the disease and the questions being asked, different compartmental structures are used. Below are the most common, applied to Ebola.</p>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.1 SIS Model (Susceptible – Infectious – Susceptible)</h4>
-                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery.</p>
+                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery. Not typically applicable to Ebola, which confers immunity.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} + \gamma I \)</li>
                     <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
                 </ul>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.2 SIR Model (Susceptible – Infectious – Recovered)</h4>
-                <p>The most classic model. Individuals recover and gain permanent immunity.</p>
+                <p>The most classic model. Individuals recover and gain permanent immunity. This is the foundation for understanding Ebola transmission, though it misses the high mortality aspect.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
                     <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
@@ -88,7 +90,7 @@
                 </ul>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.4 SEIR Model (Susceptible – Exposed – Infectious – Recovered)</h4>
-                <p>Used for diseases with a significant incubation period (latent phase).</p>
+                <p>Used for diseases with a significant incubation period (latent phase). Ebola has an incubation period of 2–21 days, so an 'Exposed' (\(E\)) compartment is vital for realistic modelling.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
                     <li>\( \frac{dE}{dt} = \frac{\beta S I}{N} - \sigma E \)</li>
@@ -96,7 +98,6 @@
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
 
-                <!-- NEW SECTION 2.5 -->
                 <h4 style="color: var(--accent); margin: 25px 0 10px;">2.5 Computing Biological Coefficients from Time-Series Data</h4>
                 <p>In real-world scenarios, the compartment values \(S(t), I(t), R(t), D(t)\) are measured daily (e.g., from reported case counts). The primary unknown values are the biological coefficients (\(\beta, \gamma, \mu, R_0\)). They are derived by integrating the SIRD equations against observed data. Below are the algebraic and computational formulas for each.</p>
                 
@@ -129,7 +130,6 @@
 
                 <p>In practice, daily data is noisy, so we use computational fitting (e.g., <strong>non-linear least squares</strong> via the <code>optim()</code> function in R). This method iteratively adjusts \(\beta, \gamma\), and \(\mu\) to find the values that minimize the squared difference between the model's predictions and the observed data. This is exactly how the portal's daily pipeline computes the coefficients for Ebola.</p>
 
-                <!-- GRAPHICAL REPRESENTATION -->
                 <h3 class="resource-subhead">3. Graphical Illustration of Compartmental Flows</h3>
                 <p>The diagram below illustrates the structure of these models. Arrows denote the movement of individuals between compartments.</p>
                 
