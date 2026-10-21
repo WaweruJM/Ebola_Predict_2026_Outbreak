@@ -110,7 +110,7 @@ train_perf <- perf_metrics(observed_I[1:train_n], predicted_I[1:train_n])
 test_perf  <- perf_metrics(observed_I[(train_n+1):n_obs], predicted_I[(train_n+1):n_obs])
 overall    <- perf_metrics(observed_I, predicted_I)
 
-# ---------- STEP 6: PROJECTION (Anchored to Last Observed State) ----------
+# ---------- STEP 6: PROJECTION ----------
 message("STEP 6 — 14-Day Projection")
 proj_t <- n_obs - 1 + 0:PROJECTION_DAYS
 anchor_state <- c(
@@ -123,43 +123,61 @@ sir_proj <- as.data.frame(ode(anchor_state, proj_t, sir_model, c(beta=beta_est, 
 proj_cum <- sir_proj$I + sir_proj$R + sir_proj$D
 
 # ---------- STEP 7: TELEMETRY & EXPORT JSON ----------
-# Find the exact latest and previous available data rows
+# The logic below rigorously checks for data exactly 24 hours prior.
+# If today's row is missing, or if yesterday's row is missing, the delta
+# shows "No entries last 24 hrs" instead of misleading historical data.
 latest_row <- outbreak_df %>% filter(date == last_date)
-prev_row   <- outbreak_df %>% filter(date < last_date) %>% slice_tail(n = 1)
+yesterday_date <- last_date - 1
+yesterday_row <- outbreak_df %>% filter(date == yesterday_date)
 
-# Fallback if there is only one row in the dataset
-if (nrow(prev_row) == 0) {
-  prev_row <- latest_row
+# Determine if we have valid 24-hour data
+if (nrow(latest_row) == 0 || nrow(yesterday_row) == 0) {
+  has_24h_delta <- FALSE
+} else {
+  has_24h_delta <- TRUE
 }
 
-fmt_delta <- function(cur, prev, unit = "") {
-  if (length(prev) == 0 || is.na(prev) || is.na(cur)) return("0 today")
+fmt_delta <- function(cur, prev, unit = "", has_data) {
+  if (!has_data) return("No entries last 24 hrs")
   d <- cur - prev
   sign_str <- if (d > 0) "+" else ""
   paste0(sign_str, d, if (nzchar(unit)) paste0(" ", unit) else "", " today")
 }
 
-trend_val <- function(cur, prev) {
-  if (length(prev) == 0 || is.na(prev) || is.na(cur)) return("")
+trend_val <- function(cur, prev, has_data) {
+  if (!has_data) return("")
   if (cur > prev) "up" else if (cur < prev) "down" else ""
 }
 
+# Safe extraction values
+safe_confirmed <- if(nrow(latest_row)>0) latest_row$confirmed else 0
+safe_deaths    <- if(nrow(latest_row)>0) latest_row$confirmed_deaths else 0
+safe_recov     <- if(nrow(latest_row)>0) latest_row$recovered else 0
+safe_active    <- if(nrow(latest_row)>0) latest_row$active_cases else 0
+safe_cfr       <- if(nrow(latest_row)>0) round(latest_row$cfr, 1) else 0
+
+prev_confirmed <- if(has_24h_delta) yesterday_row$confirmed else NA
+prev_deaths    <- if(has_24h_delta) yesterday_row$confirmed_deaths else NA
+prev_recov     <- if(has_24h_delta) yesterday_row$recovered else NA
+prev_active    <- if(has_24h_delta) yesterday_row$active_cases else NA
+prev_cfr       <- if(has_24h_delta) yesterday_row$cfr else NA
+
 case_telemetry <- list(
-  list(label = "Confirmed Cases",    value = latest_row$confirmed, 
-       unit = "", delta = fmt_delta(latest_row$confirmed, prev_row$confirmed), 
-       trend = trend_val(latest_row$confirmed, prev_row$confirmed)),
-  list(label = "Confirmed Deaths",   value = latest_row$confirmed_deaths, 
-       unit = "", delta = fmt_delta(latest_row$confirmed_deaths, prev_row$confirmed_deaths), 
-       trend = trend_val(latest_row$confirmed_deaths, prev_row$confirmed_deaths)),
-  list(label = "Recovered",          value = latest_row$recovered, 
-       unit = "", delta = fmt_delta(latest_row$recovered, prev_row$recovered), 
-       trend = trend_val(latest_row$recovered, prev_row$recovered)),
-  list(label = "Active Cases",       value = latest_row$active_cases, 
-       unit = "", delta = fmt_delta(latest_row$active_cases, prev_row$active_cases), 
-       trend = trend_val(latest_row$active_cases, prev_row$active_cases)),
-  list(label = "Case Fatality Rate", value = round(latest_row$cfr, 1), 
-       unit = "%", delta = fmt_delta(latest_row$cfr, prev_row$cfr, "pts"), 
-       trend = trend_val(latest_row$cfr, prev_row$cfr))
+  list(label = "Confirmed Cases",    value = safe_confirmed, unit = "", 
+       delta = fmt_delta(safe_confirmed, prev_confirmed, "", has_24h_delta), 
+       trend = trend_val(safe_confirmed, prev_confirmed, has_24h_delta)),
+  list(label = "Confirmed Deaths",   value = safe_deaths, unit = "", 
+       delta = fmt_delta(safe_deaths, prev_deaths, "", has_24h_delta), 
+       trend = trend_val(safe_deaths, prev_deaths, has_24h_delta)),
+  list(label = "Recovered",          value = safe_recov, unit = "", 
+       delta = fmt_delta(safe_recov, prev_recov, "", has_24h_delta), 
+       trend = trend_val(safe_recov, prev_recov, has_24h_delta)),
+  list(label = "Active Cases",       value = safe_active, unit = "", 
+       delta = fmt_delta(safe_active, prev_active, "", has_24h_delta), 
+       trend = trend_val(safe_active, prev_active, has_24h_delta)),
+  list(label = "Case Fatality Rate", value = safe_cfr, unit = "%", 
+       delta = fmt_delta(safe_cfr, prev_cfr, "pts", has_24h_delta), 
+       trend = trend_val(safe_cfr, prev_cfr, has_24h_delta))
 )
 
 bio_coefficients <- list(
