@@ -123,19 +123,17 @@ sir_proj <- as.data.frame(ode(anchor_state, proj_t, sir_model, c(beta=beta_est, 
 proj_cum <- sir_proj$I + sir_proj$R + sir_proj$D
 
 # ---------- STEP 7: TELEMETRY & EXPORT JSON ----------
-# The logic below rigorously checks for data exactly 24 hours prior.
-# If today's row is missing, or if yesterday's row is missing, the delta
-# shows "No entries last 24 hrs" instead of misleading historical data.
-latest_row <- outbreak_df %>% filter(date == last_date)
-yesterday_date <- last_date - 1
+# Anchor comparison to ACTUAL calendar dates, not just row order in CSV.
+# This fixes the issue of backfilled data causing old deltas to show as "today".
+today_date     <- Sys.Date()
+yesterday_date <- today_date - 1
+
+# Find the row for today and yesterday in the dataset
+today_row     <- outbreak_df %>% filter(date == today_date)
 yesterday_row <- outbreak_df %>% filter(date == yesterday_date)
 
-# Determine if we have valid 24-hour data
-if (nrow(latest_row) == 0 || nrow(yesterday_row) == 0) {
-  has_24h_delta <- FALSE
-} else {
-  has_24h_delta <- TRUE
-}
+# Determine if we have a valid 24-hour comparison
+has_24h_delta <- (nrow(today_row) > 0) && (nrow(yesterday_row) > 0)
 
 fmt_delta <- function(cur, prev, unit = "", has_data) {
   if (!has_data) return("No entries last 24 hrs")
@@ -149,13 +147,17 @@ trend_val <- function(cur, prev, has_data) {
   if (cur > prev) "up" else if (cur < prev) "down" else ""
 }
 
-# Safe extraction values
-safe_confirmed <- if(nrow(latest_row)>0) latest_row$confirmed else 0
-safe_deaths    <- if(nrow(latest_row)>0) latest_row$confirmed_deaths else 0
-safe_recov     <- if(nrow(latest_row)>0) latest_row$recovered else 0
-safe_active    <- if(nrow(latest_row)>0) latest_row$active_cases else 0
-safe_cfr       <- if(nrow(latest_row)>0) round(latest_row$cfr, 1) else 0
+# For card values, use the most recent data available (last_date)
+# If the CSV hasn't updated today, we show the latest available totals.
+latest_values <- outbreak_df %>% filter(date == last_date) %>% slice_tail(n = 1)
 
+safe_confirmed <- latest_values$confirmed
+safe_deaths    <- latest_values$confirmed_deaths
+safe_recov     <- latest_values$recovered
+safe_active    <- latest_values$active_cases
+safe_cfr       <- round(latest_values$cfr, 1)
+
+# Only extract comparison values if has_24h_delta is TRUE
 prev_confirmed <- if(has_24h_delta) yesterday_row$confirmed else NA
 prev_deaths    <- if(has_24h_delta) yesterday_row$confirmed_deaths else NA
 prev_recov     <- if(has_24h_delta) yesterday_row$recovered else NA
