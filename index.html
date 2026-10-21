@@ -6,16 +6,35 @@
     <title>Ebola Disease Outbreak Analysis Portal 2026</title>
     
     <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=9">
+    <link rel="stylesheet" href="css/style.css?v=10">
     
     <!-- Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Direct Background Override (Bypasses CSS relative paths) -->
     <style>
+        /* Force the background image onto the body using an inline style */
+        body {
+            background-image: url('assets/background.jpg') !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-attachment: fixed !important;
+            background-repeat: no-repeat !important;
+        }
+        
+        /* Ensure the CSS gradient overlay sits on top of the background */
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(6, 18, 34, 0.10) 0%, rgba(6, 18, 34, 0.45) 100%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* Remove the CSS-generated background pseudo-element to prevent conflicts */
         body::before {
-            background-image: url('/Ebola_Predict_2026_Outbreak/assets/ebola-theme.jpg') !important;
+            display: none !important;
         }
     </style>
 </head>
@@ -37,8 +56,7 @@
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
-                <!-- Absolute path ensures the icon loads on the home page -->
-                <img src="/Ebola_Predict_2026_Outbreak/assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="assets/background.jpg" alt="Ebola virus">
             </div>
             <div class="header-title-block">
                 <h1 class="portal-title">Ebola Disease Outbreak Analysis Portal</h1>
@@ -48,8 +66,7 @@
                 </div>
             </div>
             <div class="virus-icon right-virus" aria-hidden="true">
-                <!-- Absolute path ensures the icon loads on the home page -->
-                <img src="/Ebola_Predict_2026_Outbreak/assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="assets/background.jpg" alt="Ebola virus">
             </div>
         </div>
     </header>
