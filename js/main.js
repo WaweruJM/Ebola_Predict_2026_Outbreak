@@ -48,7 +48,6 @@ function renderSliders() {
         const input = item.querySelector('input');
         const valEl = item.querySelector('.val');
         
-        // Bind event only once
         if (!input.dataset.bound) {
             input.dataset.bound = "1";
             input.addEventListener('input', () => {
@@ -139,8 +138,8 @@ function padHead(len, arr = []) { return new Array(len).fill(null).concat(arr); 
 function chartOptions(type, yTitle = 'Count') {
     return {
         responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'nearest', intersect: true }, // Prevents jumping on click
-        onClick: () => {}, // Disables click deflection
+        interaction: { mode: 'nearest', intersect: true },
+        onClick: () => {},
         layout: { padding: { top: 8, right: 8, bottom: 8, left: 8 } },
         plugins: {
             legend: { 
@@ -190,7 +189,6 @@ function buildCharts() {
     const Pf = DATA.performance || {};
     const P = DATA.primary_parameters || {};
 
-    // Merge observed dates with projection dates for the predictive chart
     const allDates = S.months.concat(S.projection_dates || []);
 
     const defs = [
@@ -244,11 +242,8 @@ function buildCharts() {
             build: () => ({
                 labels: allDates,
                 datasets: [
-                    // The observed dataset is padded with nulls so it only draws up to the last observed date.
                     { label: 'Observed confirmed', data: S.confirmed_observed.concat(padTail(S.projection_dates?.length)), borderColor: '#1f2d3d', borderWidth: 2.6, tension: 0.3, pointRadius: 2, adjustable: false },
-                    // The fitted dataset continues into the projection period.
                     { label: 'SIR fitted', data: S.seir_fitted_I.concat(padTail(S.projection_dates?.length)), borderColor: '#e74c3c', borderWidth: 2.2, borderDash: [6,4], tension: 0.3, pointRadius: 1, adjustable: true },
-                    // The projection dataset starts where the observed data ends.
                     { label: 'Projection (14d)', data: padHead(S.months.length, S.projection_I || []), borderColor: '#8e44ad', borderWidth: 2.6, borderDash: [3,3], tension: 0.3, pointRadius: 1, adjustable: true }
                 ]
             })
@@ -297,7 +292,6 @@ function buildCharts() {
             options: opts
         });
 
-        // Store baseline data for resetting
         if (def.id === 'predictiveChart') {
             originalChartData.predictive = JSON.parse(JSON.stringify(charts[def.id].data));
         }
@@ -314,25 +308,20 @@ function updateCharts() {
     const mu = parseFloat($('#slider-mu')?.value ?? 0.05);
     const interv = parseFloat($('#slider-interv')?.value ?? 35);
 
-    // Adjust the reproduction number based on sliders
     const rt_eff = (beta / (gamma + mu)) * (1 - interv / 100);
-    // A scale factor to adjust the fitted curve to show the effect of user parameters
     const scale = Math.max(0.3, Math.min(2.0, rt_eff));
 
-    // 1. Update the Predictive Chart (only the adjustable datasets)
     const pc = charts.predictiveChart;
     if (pc && originalChartData.predictive) {
-        // We scale the baseline data to avoid compounding effects
         const baseFitted = originalChartData.predictive.datasets[1].data;
         const baseProj = originalChartData.predictive.datasets[2].data;
 
         pc.data.datasets[1].data = baseFitted.map(v => v == null ? null : +(v * scale).toFixed(2));
         pc.data.datasets[2].data = baseProj.map(v => v == null ? null : +(v * scale).toFixed(2));
         
-        pc.update('none'); // 'none' prevents animation jitter
+        pc.update('none');
     }
 
-    // 2. Update the Coefficients Chart (adjusting the flat lines)
     const cc = charts.coeffChart;
     if (cc) {
         cc.data.datasets[0].data = cc.data.datasets[0].data.map(() => +beta.toFixed(3));
@@ -378,7 +367,6 @@ const FALLBACK_DATA = {
 
 async function loadData() {
     try {
-        // Cache-busting to ensure the latest data is always fetched
         const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         DATA = await res.json();
@@ -391,21 +379,12 @@ async function loadData() {
 // ---------- Initialization ----------
 async function init() {
     await loadData();
-    
-    // Populate cards
     renderCards('caseTelemetryCards', DATA.case_telemetry);
     renderCards('bioCoeffCards', DATA.bio_coefficients);
-    
-    // Setup sliders
     renderSliders();
-    
-    // Render all charts
     buildCharts();
-    
-    // Wire up the reset button
     $('#resetBtn').addEventListener('click', resetSliders);
     
-    // Add timestamp to footer if available
     if (DATA.generated_at) {
         const stamp = document.createElement('span');
         stamp.style.fontSize = '0.75rem';
@@ -417,5 +396,4 @@ async function init() {
     }
 }
 
-// Start
 document.addEventListener('DOMContentLoaded', init);
