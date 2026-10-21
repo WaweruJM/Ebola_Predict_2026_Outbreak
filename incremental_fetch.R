@@ -122,22 +122,44 @@ anchor_state <- c(
 sir_proj <- as.data.frame(ode(anchor_state, proj_t, sir_model, c(beta=beta_est, gamma=gamma_est, mu=mu_est)))
 proj_cum <- sir_proj$I + sir_proj$R + sir_proj$D
 
-# ---------- STEP 7: EXPORT JSON ----------
-latest   <- tail(outbreak_df, 1)
-previous <- tail(outbreak_df, 2)[1,]
+# ---------- STEP 7: TELEMETRY & EXPORT JSON ----------
+# Find the exact latest and previous available data rows
+latest_row <- outbreak_df %>% filter(date == last_date)
+prev_row   <- outbreak_df %>% filter(date < last_date) %>% slice_tail(n = 1)
+
+# Fallback if there is only one row in the dataset
+if (nrow(prev_row) == 0) {
+  prev_row <- latest_row
+}
 
 fmt_delta <- function(cur, prev, unit = "") {
-  if (is.na(prev) || is.na(cur)) return("--")
+  if (length(prev) == 0 || is.na(prev) || is.na(cur)) return("0 today")
   d <- cur - prev
-  paste0(ifelse(d >= 0, "+", ""), d, if (nzchar(unit)) paste0(" ", unit) else "", " today")
+  sign_str <- if (d > 0) "+" else ""
+  paste0(sign_str, d, if (nzchar(unit)) paste0(" ", unit) else "", " today")
+}
+
+trend_val <- function(cur, prev) {
+  if (length(prev) == 0 || is.na(prev) || is.na(cur)) return("")
+  if (cur > prev) "up" else if (cur < prev) "down" else ""
 }
 
 case_telemetry <- list(
-  list(label = "Confirmed Cases",    value = latest$confirmed, unit = "", delta = fmt_delta(latest$confirmed, previous$confirmed), trend = ifelse(latest$confirmed >= previous$confirmed, "up", "down")),
-  list(label = "Confirmed Deaths",   value = latest$confirmed_deaths, unit = "", delta = fmt_delta(latest$confirmed_deaths, previous$confirmed_deaths), trend = ifelse(latest$confirmed_deaths >= previous$confirmed_deaths, "up", "down")),
-  list(label = "Recovered",          value = latest$recovered, unit = "", delta = fmt_delta(latest$recovered, previous$recovered), trend = ifelse(latest$recovered >= previous$recovered, "up", "down")),
-  list(label = "Active Cases",       value = latest$active_cases, unit = "", delta = fmt_delta(latest$active_cases, previous$active_cases), trend = ifelse(latest$active_cases >= previous$active_cases, "up", "down")),
-  list(label = "Case Fatality Rate", value = round(latest$cfr, 1), unit = "%", delta = fmt_delta(latest$cfr, previous$cfr, "pts"), trend = ifelse(latest$cfr >= previous$cfr, "up", "down"))
+  list(label = "Confirmed Cases",    value = latest_row$confirmed, 
+       unit = "", delta = fmt_delta(latest_row$confirmed, prev_row$confirmed), 
+       trend = trend_val(latest_row$confirmed, prev_row$confirmed)),
+  list(label = "Confirmed Deaths",   value = latest_row$confirmed_deaths, 
+       unit = "", delta = fmt_delta(latest_row$confirmed_deaths, prev_row$confirmed_deaths), 
+       trend = trend_val(latest_row$confirmed_deaths, prev_row$confirmed_deaths)),
+  list(label = "Recovered",          value = latest_row$recovered, 
+       unit = "", delta = fmt_delta(latest_row$recovered, prev_row$recovered), 
+       trend = trend_val(latest_row$recovered, prev_row$recovered)),
+  list(label = "Active Cases",       value = latest_row$active_cases, 
+       unit = "", delta = fmt_delta(latest_row$active_cases, prev_row$active_cases), 
+       trend = trend_val(latest_row$active_cases, prev_row$active_cases)),
+  list(label = "Case Fatality Rate", value = round(latest_row$cfr, 1), 
+       unit = "%", delta = fmt_delta(latest_row$cfr, prev_row$cfr, "pts"), 
+       trend = trend_val(latest_row$cfr, prev_row$cfr))
 )
 
 bio_coefficients <- list(
@@ -158,7 +180,7 @@ chart_series <- list(
   recovered_observed   = ts$recovered,
   deaths_observed      = ts$confirmed_deaths,
   seir_fitted_I        = predicted_I[obs_idx],
-  projection_dates     = format(last_date + 1:PROJECTION_DAYS, "%Y-%m-%d"), # Next 14 days
+  projection_dates     = format(last_date + 1:PROJECTION_DAYS, "%Y-%m-%d"),
   projection_I         = proj_cum[-1],
   projection_cum       = cumsum(c(tail(cumsum(predicted_I), 1), proj_cum[-1]))[-1],
   sir_I                = sir_full$I[obs_idx],
@@ -186,7 +208,7 @@ sliders <- list(
 
 payload <- list(
   generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  last_data_date = format(last_date, "%Y-%m-%d"), # Key addition for frontend
+  last_data_date = format(last_date, "%Y-%m-%d"),
   population_at_risk = POPULATION_AT_RISK,
   projection_days = PROJECTION_DAYS,
   primary_parameters = list(beta = beta_est, gamma = gamma_est, mu = mu_est, R0 = R0_est, growth_rate = beta_est - gamma_est - mu_est),
