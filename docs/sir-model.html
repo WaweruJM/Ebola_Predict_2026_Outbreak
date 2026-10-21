@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SIR Model of Infectious Diseases — Ebola Portal</title>
-    <link rel="stylesheet" href="../css/style.css?v=8">
+    <link rel="stylesheet" href="../css/style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Load MathJax for proper equation rendering -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
-<body style="--bg-image: url('../assets/ebola-theme.jpg');">
+<body style="--bg-image: url('../assets/background.jpg');">
 
     <div class="top-marquee">
         <div class="marquee-track">
@@ -23,7 +26,7 @@
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
-                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="../assets/background.jpg" alt="Ebola virus">
             </div>
             <div class="header-title-block">
                 <h1 class="portal-title">SIR Model of Infectious Diseases</h1>
@@ -33,51 +36,149 @@
                 </div>
             </div>
             <div class="virus-icon right-virus" aria-hidden="true">
-                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="../assets/background.jpg" alt="Ebola virus">
             </div>
         </div>
     </header>
 
     <main class="portal-main">
         <section class="card-row">
-            <h2 class="row-heading">What is the SIR Model?</h2>
+            <h2 class="row-heading">Comprehensive Guide to Compartmental Modelling</h2>
             <div class="resource-body">
-                <p>The <strong>SIR model</strong> is one of the foundational frameworks of mathematical epidemiology. It divides a population into compartments that track how individuals move through different states of infection over time.</p>
-                <h3 class="resource-subhead">The Three Classic Compartments</h3>
+                
+                <p>Mathematical modelling of infectious diseases, particularly for Ebola, is essential for understanding transmission dynamics, forecasting outbreak trajectories, and evaluating the effectiveness of public health interventions. The foundational framework for this is the <strong>compartmental model</strong>, which divides a population into distinct groups (compartments) based on their infection status. Individuals flow between these compartments over time.</p>
+
+                <h3 class="resource-subhead">1. Definition of Key Biological Coefficients</h3>
+                <p>To build a model, we must define the biological parameters that govern how individuals move between compartments. These coefficients are critical and must be estimated from real-world data.</p>
                 <ul class="resource-list">
-                    <li><strong>S — Susceptible:</strong> Individuals who have never been infected and can contract the disease.</li>
-                    <li><strong>I — Infectious:</strong> Individuals who are currently infected and can transmit the pathogen.</li>
-                    <li><strong>R — Recovered:</strong> Individuals who have acquired immunity and can no longer be infected.</li>
+                    <li><strong>Contact Rate (\(c\)):</strong> The average number of contacts an infectious individual makes per unit time (e.g., per day).</li>
+                    <li><strong>Probability of Transmission given a Contact (\(\tau\)):</strong> The likelihood that a contact between an infectious and susceptible individual results in transmission. This depends on the pathogen and the nature of the contact.</li>
+                    <li><strong>Transmission Rate (\(\beta\)):</strong> The effective contact rate, defined as \(\beta = c \cdot \tau\). It represents the rate at which susceptible individuals become infectious.</li>
+                    <li><strong>Recovery Rate (\(\gamma\)):</strong> The rate at which infectious individuals recover and move to the Recovered compartment. It is the inverse of the mean infectious period (\(1/D\)).</li>
+                    <li><strong>Mortality Rate (\(\mu\)):</strong> The rate at which infectious individuals die from the disease and move to the Deceased compartment.</li>
+                    <li><strong>Basic Reproduction Number (\(R_0\)):</strong> The expected number of secondary cases caused by one infectious individual in a completely susceptible population. For a SIR model with mortality, \(R_0 = \beta / (\gamma + \mu)\). If \(R_0 > 1\), the outbreak grows; if \(R_0 < 1\), it shrinks.</li>
                 </ul>
-                <h3 class="resource-subhead">Extension Used in This Portal</h3>
-                <p>Ebola has a very high case-fatality rate, so this portal uses an extended <strong>SIRD</strong> structure with a fourth compartment:</p>
+
+                <h3 class="resource-subhead">2. Compartmental Models and their Equations</h3>
+                <p>Depending on the disease and the questions being asked, different compartmental structures are used. Below are the most common, applied to Ebola.</p>
+
+                <h4 style="color: var(--accent); margin: 15px 0 5px;">2.1 SIS Model (Susceptible – Infectious – Susceptible)</h4>
+                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery. Not typically applicable to Ebola, which confers immunity.</p>
                 <ul class="resource-list">
-                    <li><strong>D — Deceased:</strong> Individuals who died from the infection.</li>
+                    <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} + \gamma I \)</li>
+                    <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
                 </ul>
-                <h3 class="resource-subhead">The Governing Equations</h3>
-                <pre class="resource-formula">
-dS/dt = −β · S · I / N
-dI/dt =  β · S · I / N − (γ + μ) · I
-dR/dt =  γ · I
-dD/dt =  μ · I</pre>
-                <p>Where each symbol has a direct epidemiological meaning:</p>
+
+                <h4 style="color: var(--accent); margin: 15px 0 5px;">2.2 SIR Model (Susceptible – Infectious – Recovered)</h4>
+                <p>The most classic model. Individuals recover and gain permanent immunity. This is the foundation for understanding Ebola transmission, though it misses the high mortality aspect.</p>
                 <ul class="resource-list">
-                    <li><strong>β (beta)</strong> — the transmission rate.</li>
-                    <li><strong>γ (gamma)</strong> — the recovery rate (inverse of mean infectious period).</li>
-                    <li><strong>μ (mu)</strong> — the mortality rate out of the infectious compartment.</li>
-                    <li><strong>N</strong> — total population size (S + I + R + D).</li>
+                    <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
+                    <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
+                    <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
-                <h3 class="resource-subhead">The Reproduction Number</h3>
-                <p>The single most informative summary quantity is the <strong>basic reproduction number</strong>:</p>
-                <pre class="resource-formula">R₀ = β / (γ + μ)</pre>
-                <p>If R₀ > 1, the outbreak grows; if R₀ < 1, it shrinks. Interventions aim to reduce the effective reproduction number Rₜ below 1.</p>
-                <h3 class="resource-subhead">Assumptions and Limitations</h3>
+
+                <h4 style="color: var(--accent); margin: 15px 0 5px;">2.3 SIRD Model (Susceptible – Infectious – Recovered – Deceased)</h4>
+                <p>Used when mortality is a key feature. Ebola has a high case fatality rate, so a <strong>SIRD</strong> model is required to track deaths separately from recoveries.</p>
                 <ul class="resource-list">
-                    <li>Homogeneous mixing: all individuals contact each other with equal probability.</li>
-                    <li>No latent period: newly infected become infectious immediately.</li>
-                    <li>Permanent immunity after recovery.</li>
-                    <li>Closed population: no births, migration, or non-disease deaths.</li>
+                    <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
+                    <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - (\gamma + \mu) I \)</li>
+                    <li>\( \frac{dR}{dt} = \gamma I \)</li>
+                    <li>\( \frac{dD}{dt} = \mu I \)</li>
                 </ul>
+
+                <h4 style="color: var(--accent); margin: 15px 0 5px;">2.4 SEIR Model (Susceptible – Exposed – Infectious – Recovered)</h4>
+                <p>Used for diseases with a significant incubation period (latent phase). Ebola has an incubation period of 2–21 days, so an 'Exposed' (\(E\)) compartment is vital for realistic modelling.</p>
+                <ul class="resource-list">
+                    <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
+                    <li>\( \frac{dE}{dt} = \frac{\beta S I}{N} - \sigma E \)</li>
+                    <li>\( \frac{dI}{dt} = \sigma E - \gamma I \)</li>
+                    <li>\( \frac{dR}{dt} = \gamma I \)</li>
+                </ul>
+
+                <!-- GRAPHICAL REPRESENTATION OF COMPARTMENTAL MODELS -->
+                <h3 class="resource-subhead">3. Graphical Illustration of Compartmental Flows</h3>
+                <p>The diagram below illustrates the structure of these models. Arrows denote the movement of individuals between compartments.</p>
+                
+                <div style="text-align: center; margin: 20px 0; background: #fff; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #ccc;">
+                    <!-- Inline SVG to draw the compartmental models -->
+                    <svg viewBox="0 0 800 600" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#333" />
+                            </marker>
+                        </defs>
+                        
+                        <!-- SIS -->
+                        <text x="50" y="50" font-weight="bold" font-size="18" fill="#0e2a4a">SIS Model</text>
+                        <rect x="50" y="70" width="100" height="50" rx="5" fill="#2980b9" />
+                        <text x="100" y="100" text-anchor="middle" fill="white" font-weight="bold">S</text>
+                        <rect x="250" y="70" width="100" height="50" rx="5" fill="#e74c3c" />
+                        <text x="300" y="100" text-anchor="middle" fill="white" font-weight="bold">I</text>
+                        <line x1="150" y1="85" x2="245" y2="85" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="200" y="75" text-anchor="middle" font-size="12">β</text>
+                        <line x1="250" y1="105" x2="155" y2="105" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="200" y="125" text-anchor="middle" font-size="12">γ</text>
+
+                        <!-- SIR -->
+                        <text x="50" y="200" font-weight="bold" font-size="18" fill="#0e2a4a">SIR Model</text>
+                        <rect x="50" y="220" width="100" height="50" rx="5" fill="#2980b9" />
+                        <text x="100" y="250" text-anchor="middle" fill="white" font-weight="bold">S</text>
+                        <rect x="250" y="220" width="100" height="50" rx="5" fill="#e74c3c" />
+                        <text x="300" y="250" text-anchor="middle" fill="white" font-weight="bold">I</text>
+                        <rect x="450" y="220" width="100" height="50" rx="5" fill="#27ae60" />
+                        <text x="500" y="250" text-anchor="middle" fill="white" font-weight="bold">R</text>
+                        <line x1="150" y1="235" x2="245" y2="235" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="200" y="225" text-anchor="middle" font-size="12">β</text>
+                        <line x1="350" y1="235" x2="445" y2="235" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="400" y="225" text-anchor="middle" font-size="12">γ</text>
+
+                        <!-- SEIR -->
+                        <text x="50" y="350" font-weight="bold" font-size="18" fill="#0e2a4a">SEIR Model</text>
+                        <rect x="50" y="370" width="100" height="50" rx="5" fill="#2980b9" />
+                        <text x="100" y="400" text-anchor="middle" fill="white" font-weight="bold">S</text>
+                        <rect x="200" y="370" width="100" height="50" rx="5" fill="#f39c12" />
+                        <text x="250" y="400" text-anchor="middle" fill="white" font-weight="bold">E</text>
+                        <rect x="350" y="370" width="100" height="50" rx="5" fill="#e74c3c" />
+                        <text x="400" y="400" text-anchor="middle" fill="white" font-weight="bold">I</text>
+                        <rect x="500" y="370" width="100" height="50" rx="5" fill="#27ae60" />
+                        <text x="550" y="400" text-anchor="middle" fill="white" font-weight="bold">R</text>
+                        <line x1="150" y1="385" x2="195" y2="385" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="175" y="375" text-anchor="middle" font-size="12">β</text>
+                        <line x1="300" y1="385" x2="345" y2="385" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="325" y="375" text-anchor="middle" font-size="12">σ</text>
+                        <line x1="450" y1="385" x2="495" y2="385" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="475" y="375" text-anchor="middle" font-size="12">γ</text>
+
+                        <!-- SIRD -->
+                        <text x="50" y="500" font-weight="bold" font-size="18" fill="#0e2a4a">SIRD Model (Ebola)</text>
+                        <rect x="50" y="520" width="100" height="50" rx="5" fill="#2980b9" />
+                        <text x="100" y="550" text-anchor="middle" fill="white" font-weight="bold">S</text>
+                        <rect x="250" y="520" width="100" height="50" rx="5" fill="#e74c3c" />
+                        <text x="300" y="550" text-anchor="middle" fill="white" font-weight="bold">I</text>
+                        <rect x="450" y="520" width="100" height="50" rx="5" fill="#27ae60" />
+                        <text x="500" y="550" text-anchor="middle" fill="white" font-weight="bold">R</text>
+                        <rect x="450" y="620" width="100" height="50" rx="5" fill="#7f8c8d" />
+                        <text x="500" y="650" text-anchor="middle" fill="white" font-weight="bold">D</text>
+                        <line x1="150" y1="535" x2="245" y2="535" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="200" y="525" text-anchor="middle" font-size="12">β</text>
+                        <line x1="350" y1="535" x2="445" y2="535" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="400" y="525" text-anchor="middle" font-size="12">γ</text>
+                        <line x1="350" y1="555" x2="445" y2="625" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                        <text x="390" y="600" text-anchor="middle" font-size="12">μ</text>
+                    </svg>
+                </div>
+
+                <h3 class="resource-subhead">4. Modelling, Future Projections, and Utility</h3>
+                <p>Building the model (fitting \(\beta, \gamma, \mu\) to observed data) allows us to trace the epidemic curve. Once calibrated, we can use the model for <strong>future projections</strong>.</p>
+                <ul class="resource-list">
+                    <li><strong>Projections:</strong> By running the equations forward in time, we can predict the number of cases, hospitalizations, and deaths under current conditions. This gives healthcare providers time to mobilize resources.</li>
+                    <li><strong>Informing Preventive Measures:</strong> Interventions aim to reduce \(\beta\) (e.g., isolation, safe burials) or increase \(\gamma\) (e.g., rapid treatment). The model allows us to simulate "what if" scenarios to assess the impact of these measures before they are implemented.</li>
+                    <li><strong>Posterior (Retrospective) Projections:</strong> Modelling is also used to look backward. By analyzing the early phase of an outbreak, we can infer the time and magnitude of the initial <strong>animal-to-human (zoonotic) transmission event</strong> that seeded the human epidemic. This is crucial for understanding spillover dynamics for future outbreaks.</li>
+                </ul>
+
+                <h3 class="resource-subhead">5. Summary and Relevance to Ebola</h3>
+                <p>For the Ebola outbreak, the SIRD or SEIR models are the most appropriate. They capture the high mortality rate (D) and the significant incubation period (E). The daily computational pipeline of this portal uses these structures to fit the observed data and generate real-time, 14-day forecasts. This provides health-policy leaders with the evidence base needed to plan and evaluate response strategies.</p>
+
                 <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
             </div>
         </section>
@@ -85,11 +186,9 @@ dD/dt =  μ · I</pre>
 
     <footer class="portal-footer">
         <div class="footer-links">
-            <span>© 2026 Ebola Outbreak Analysis Portal</span>
-            <span class="footer-sep">|</span>
             <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
-            <span class="footer-sep">|</span>
-            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare Experience through Technology</a>
+            <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
         </div>
     </footer>
 
