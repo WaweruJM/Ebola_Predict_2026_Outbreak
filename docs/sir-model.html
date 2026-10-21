@@ -7,10 +7,7 @@
     <link rel="stylesheet" href="../css/style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Load Chart.js for the SIRD line graph -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    
-    <!-- Load MathJax for proper equation rendering -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
@@ -67,14 +64,14 @@
                 <p>Depending on the disease and the questions being asked, different compartmental structures are used. Below are the most common, applied to Ebola.</p>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.1 SIS Model (Susceptible – Infectious – Susceptible)</h4>
-                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery. Not typically applicable to Ebola, which confers immunity.</p>
+                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} + \gamma I \)</li>
                     <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
                 </ul>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.2 SIR Model (Susceptible – Infectious – Recovered)</h4>
-                <p>The most classic model. Individuals recover and gain permanent immunity. This is the foundation for understanding Ebola transmission, though it misses the high mortality aspect.</p>
+                <p>The most classic model. Individuals recover and gain permanent immunity.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
                     <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
@@ -91,7 +88,7 @@
                 </ul>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.4 SEIR Model (Susceptible – Exposed – Infectious – Recovered)</h4>
-                <p>Used for diseases with a significant incubation period (latent phase). Ebola has an incubation period of 2–21 days, so an 'Exposed' (\(E\)) compartment is vital for realistic modelling.</p>
+                <p>Used for diseases with a significant incubation period (latent phase).</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
                     <li>\( \frac{dE}{dt} = \frac{\beta S I}{N} - \sigma E \)</li>
@@ -99,12 +96,44 @@
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
 
-                <!-- REVISED GRAPHICAL REPRESENTATION -->
+                <!-- NEW SECTION 2.5 -->
+                <h4 style="color: var(--accent); margin: 25px 0 10px;">2.5 Computing Biological Coefficients from Time-Series Data</h4>
+                <p>In real-world scenarios, the compartment values \(S(t), I(t), R(t), D(t)\) are measured daily (e.g., from reported case counts). The primary unknown values are the biological coefficients (\(\beta, \gamma, \mu, R_0\)). They are derived by integrating the SIRD equations against observed data. Below are the algebraic and computational formulas for each.</p>
+                
+                <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 15px;">
+                    <p><strong>1. Mortality Rate (\(\mu\))</strong><br>
+                    \(\mu\) is the rate at which infectious individuals die. It is calculated as the number of deaths divided by the number of active infectious individuals over a time step.</p>
+                    <p>\( \mu = \frac{\Delta D / \Delta t}{I} \)</p>
+                    <p><em>Alternatively, if the Case Fatality Rate (CFR) and the mean infectious period (\(1/\gamma\)) are known: \(\mu = \frac{\text{CFR}}{1/\gamma}\).</em></p>
+                </div>
+
+                <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 15px;">
+                    <p><strong>2. Recovery Rate (\(\gamma\))</strong><br>
+                    \(\gamma\) is the rate at which infectious individuals recover. It is derived from the change in the Recovered compartment.</p>
+                    <p>\( \gamma = \frac{\Delta R / \Delta t}{I} \)</p>
+                    <p><em>Alternatively, \(\gamma = 1 / \text{Mean Infectious Period}\).</em></p>
+                </div>
+
+                <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 15px;">
+                    <p><strong>3. Transmission Rate (\(\beta\))</strong><br>
+                    \(\beta\) is derived from the rate of new infections (\(\Delta S\)).</p>
+                    <p>\( \beta = \frac{-(\Delta S / \Delta t)}{S \cdot I / N} \)</p>
+                    <p><em>Alternatively, \(\beta\) can be estimated by fitting the early exponential growth phase of the outbreak.</em></p>
+                </div>
+
+                <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 25px;">
+                    <p><strong>4. Basic Reproduction Number (\(R_0\))</strong><br>
+                    Once \(\beta, \gamma\), and \(\mu\) are computed, \(R_0\) is calculated directly:</p>
+                    <p>\( R_0 = \frac{\beta}{\gamma + \mu} \)</p>
+                </div>
+
+                <p>In practice, daily data is noisy, so we use computational fitting (e.g., <strong>non-linear least squares</strong> via the <code>optim()</code> function in R). This method iteratively adjusts \(\beta, \gamma\), and \(\mu\) to find the values that minimize the squared difference between the model's predictions and the observed data. This is exactly how the portal's daily pipeline computes the coefficients for Ebola.</p>
+
+                <!-- GRAPHICAL REPRESENTATION -->
                 <h3 class="resource-subhead">3. Graphical Illustration of Compartmental Flows</h3>
                 <p>The diagram below illustrates the structure of these models. Arrows denote the movement of individuals between compartments.</p>
                 
                 <div style="text-align: center; margin: 20px 0; background: #fff; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #ccc; overflow: visible;">
-                    <!-- Expanded viewBox to 800x720 to fit SIRD fully -->
                     <svg viewBox="0 0 800 720" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -162,7 +191,7 @@
                         <rect x="450" y="520" width="100" height="50" rx="5" fill="#27ae60" />
                         <text x="500" y="550" text-anchor="middle" fill="white" font-weight="bold">R</text>
                         
-                        <!-- D Compartment (Now fully visible) -->
+                        <!-- D Compartment -->
                         <rect x="450" y="640" width="100" height="50" rx="5" fill="#7f8c8d" />
                         <text x="500" y="670" text-anchor="middle" fill="white" font-weight="bold">D</text>
                         
@@ -177,7 +206,14 @@
                     </svg>
                 </div>
 
-                <h3 class="resource-subhead">4. Modelling, Future Projections, and Utility</h3>
+                <h3 class="resource-subhead">4. Visualizing the SIRD Outbreak Curve</h3>
+                <p>To complement the flow diagram above, the chart below simulates a typical Ebola outbreak over 120 days using the SIRD model. For this demonstration, a small population of <strong>\(S = 1,000\)</strong> is used to clearly illustrate the scale of the compartments. You can observe the Susceptible pool depleting as the Infectious curve peaks. Crucially, the Deceased (D) curve rises steadily alongside Recoveries, reflecting Ebola's high case fatality rate.</p>
+                
+                <div class="chart-container" style="position: relative; height: 400px; width: 100%; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccc; margin-top: 15px;">
+                    <canvas id="sirdChart"></canvas>
+                </div>
+
+                <h3 class="resource-subhead">5. Modelling, Future Projections, and Utility</h3>
                 <p>Building the model (fitting \(\beta, \gamma, \mu\) to observed data) allows us to trace the epidemic curve. Once calibrated, we can use the model for <strong>future projections</strong>.</p>
                 <ul class="resource-list">
                     <li><strong>Projections:</strong> By running the equations forward in time, we can predict the number of cases, hospitalizations, and deaths under current conditions. This gives healthcare providers time to mobilize resources.</li>
@@ -185,16 +221,8 @@
                     <li><strong>Posterior (Retrospective) Projections:</strong> Modelling is also used to look backward. By analyzing the early phase of an outbreak, we can infer the time and magnitude of the initial <strong>animal-to-human (zoonotic) transmission event</strong> that seeded the human epidemic. This is crucial for understanding spillover dynamics for future outbreaks.</li>
                 </ul>
 
-                <h3 class="resource-subhead">5. Summary and Relevance to Ebola</h3>
+                <h3 class="resource-subhead">6. Summary and Relevance to Ebola</h3>
                 <p>For the Ebola outbreak, the SIRD or SEIR models are the most appropriate. They capture the high mortality rate (D) and the significant incubation period (E). The daily computational pipeline of this portal uses these structures to fit the observed data and generate real-time, 14-day forecasts. This provides health-policy leaders with the evidence base needed to plan and evaluate response strategies.</p>
-
-                <!-- NEW SECTION: SIRD LINE GRAPH -->
-                <h3 class="resource-subhead">6. Visualizing the SIRD Outbreak Curve</h3>
-                <p>The chart below simulates a typical Ebola outbreak (SIRD model) over 120 days. The Susceptible population shrinks as the Infectious population peaks and then falls. The Recovered population grows, but so does the Deceased population, reflecting the high case fatality rate of Ebola.</p>
-                
-                <div class="chart-container" style="position: relative; height: 400px; width: 100%; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccc; margin-top: 15px;">
-                    <canvas id="sirdChart"></canvas>
-                </div>
 
                 <p class="resource-back" style="margin-top: 40px;"><a href="../index.html">← Back to Portal</a></p>
             </div>
@@ -209,25 +237,23 @@
         </div>
     </footer>
 
-    <!-- Script to render the SIRD Graph -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const ctx = document.getElementById('sirdChart').getContext('2d');
             
-            // Generate mock data for a typical SIRD curve
             const days = [];
             const susceptible = [];
             const infectious = [];
             const recovered = [];
             const deceased = [];
             
-            let S = 100000; // Total population
-            let I = 10;     // Initial cases
+            let S = 1000; 
+            let I = 10;     
             let R = 0;
             let D = 0;
-            const beta = 0.3; // Transmission rate
-            const gamma = 0.1; // Recovery rate
-            const mu = 0.15; // Mortality rate (Ebola-specific)
+            const beta = 0.3; 
+            const gamma = 0.1; 
+            const mu = 0.15; 
 
             for (let t = 0; t <= 120; t++) {
                 days.push(`Day ${t}`);
@@ -236,7 +262,6 @@
                 recovered.push(R);
                 deceased.push(D);
 
-                // Euler integration of SIRD equations
                 const N = S + I + R + D;
                 const newInfections = (beta * S * I) / N;
                 const newRecoveries = gamma * I;
@@ -297,7 +322,7 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Typical SIRD Outbreak Curve (Ebola)',
+                            text: 'Typical SIRD Outbreak Curve (Ebola, S=1000)',
                             font: { size: 16, family: 'Inter' },
                             color: '#0e2a4a'
                         },
