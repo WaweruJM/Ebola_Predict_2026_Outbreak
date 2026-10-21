@@ -5,15 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ebola Disease Outbreak Analysis Portal 2026</title>
     
-    <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=10">
-    
-    <!-- Dependencies -->
+    <link rel="stylesheet" href="css/style.css?v=11">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* Force the background image onto the body using an inline style */
         body {
             background-image: url('assets/background.jpg') !important;
             background-size: cover !important;
@@ -21,26 +17,16 @@
             background-attachment: fixed !important;
             background-repeat: no-repeat !important;
         }
-        
-        /* Ensure the CSS gradient overlay sits on top of the background */
         body::after {
-            content: "";
-            position: fixed;
-            inset: 0;
+            content: ""; position: fixed; inset: 0;
             background: radial-gradient(ellipse at center, rgba(6, 18, 34, 0.10) 0%, rgba(6, 18, 34, 0.45) 100%);
-            z-index: -1;
-            pointer-events: none;
+            z-index: -1; pointer-events: none;
         }
-        
-        /* Remove the CSS-generated background pseudo-element to prevent conflicts */
-        body::before {
-            display: none !important;
-        }
+        body::before { display: none !important; }
     </style>
 </head>
 <body>
 
-    <!-- TOP MARQUEE -->
     <div class="top-marquee">
         <div class="marquee-track">
             <span class="marquee-text">
@@ -52,7 +38,6 @@
         </div>
     </div>
 
-    <!-- HEADER -->
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
@@ -64,6 +49,7 @@
                     <span class="blink-dot"></span>
                     <span class="live-text">Daily Updated Data Analysis</span>
                 </div>
+                <div id="header-refresh-time" style="font-size: 0.75rem; color: #6b7c93; margin-top: 6px;"></div>
             </div>
             <div class="virus-icon right-virus" aria-hidden="true">
                 <img src="assets/background.jpg" alt="Ebola virus">
@@ -71,22 +57,17 @@
         </div>
     </header>
 
-    <!-- MAIN CONTENT -->
     <main class="portal-main">
-
-        <!-- Row 1: Cumulative Case Telemetry -->
         <section class="card-row">
             <h2 class="row-heading">Cumulative Case Telemetry</h2>
             <div class="cards-grid" id="caseTelemetryCards"></div>
         </section>
 
-        <!-- Row 2: Biological Coefficients -->
         <section class="card-row">
             <h2 class="row-heading">Biological Coefficients</h2>
             <div class="cards-grid" id="bioCoeffCards"></div>
         </section>
 
-        <!-- Row 3: Charts and Sliders -->
         <section class="analysis-row">
             <div class="charts-column" id="chartsColumn"></div>
             <aside class="slider-column">
@@ -105,7 +86,6 @@
             </aside>
         </section>
 
-        <!-- Row 4: Resources -->
         <section class="resources-section">
             <h2 class="row-heading">Resources</h2>
             <div class="resources-grid">
@@ -131,21 +111,17 @@
                 </a>
             </div>
         </section>
-
     </main>
 
-    <!-- FOOTER -->
+    <!-- REVISED FOOTER: 3 centered lines -->
     <footer class="portal-footer">
         <div class="footer-links">
-            <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
-            <span class="footer-sep">|</span>
             <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
-            <span class="footer-sep">|</span>
-            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare Experience through Technology</a>
+            <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
         </div>
     </footer>
 
-    <!-- Scripts -->
     <script src="js/main.js" defer></script>
 </body>
 </html>
