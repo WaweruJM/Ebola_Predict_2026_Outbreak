@@ -37,8 +37,7 @@ body::before {
     content: "";
     position: fixed;
     inset: 0;
-    background: var(--bg-image) center/cover no-repeat;
-    filter: brightness(0.95) saturate(1.15) contrast(1.05);
+    background: var(--bg-image, url("/Ebola_Predict_2026_Outbreak/assets/ebola-theme.jpg")) center/cover no-repeat;    filter: brightness(0.95) saturate(1.15) contrast(1.05);
     z-index: -2;
 }
 body::after {
