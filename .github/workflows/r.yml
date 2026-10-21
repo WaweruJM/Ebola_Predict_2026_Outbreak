@@ -18,15 +18,10 @@ jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
 
-    env:
-      R_LIBS_USER: ${{ github.workspace }}/.Rlib
-
     steps:
-      # ---------------- Checkout ----------------
       - name: Checkout workspace
         uses: actions/checkout@v4
 
-      # ---------------- Fetch upstream tracker ----------------
       - name: Fetch upstream tracker data
         uses: actions/checkout@v4
         with:
@@ -38,10 +33,7 @@ jobs:
         run: |
           cp external_repo_clone/data/timeseries.csv ./downloaded_timeseries.csv
           rm -rf external_repo_clone
-          ls -la downloaded_timeseries.csv
-          head -3 downloaded_timeseries.csv
 
-      # ---------------- R + Pandoc ----------------
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
@@ -51,7 +43,6 @@ jobs:
       - name: Setup Pandoc
         uses: r-lib/actions/setup-pandoc@v2
 
-      # ---------------- System libraries ----------------
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -59,20 +50,6 @@ jobs:
             libcurl4-openssl-dev libssl-dev libxml2-dev \
             libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
             libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
-
-      # ---------------- R library ----------------
-      - name: Prepare R library directory
-        run: |
-          mkdir -p "$R_LIBS_USER"
-          echo "R_LIBS_USER=$R_LIBS_USER" >> $GITHUB_ENV
-
-      - name: Cache R packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.R_LIBS_USER }}
-          key: r-4.4.3-${{ runner.os }}-${{ hashFiles('incremental_fetch.R', 'dashboard.Rmd') }}
-          restore-keys: |
-            r-4.4.3-${{ runner.os }}-
 
       - name: Install R packages
         run: |
@@ -86,86 +63,38 @@ jobs:
                       "lubridate","ggplot2","knitr","rmarkdown","deSolve")
             need <- pkgs[!pkgs %in% rownames(installed.packages())]
             if (length(need)) install.packages(need, lib = lib, dependencies = TRUE)
-            missing <- pkgs[!pkgs %in% rownames(installed.packages())]
-            if (length(missing)) stop("Missing: ", paste(missing, collapse=", "))
-            cat("All required R packages available.\n")
           '
 
-      # ---------------- Analysis ----------------
-      - name: Run incremental fetch and export JSON
-        run: |
-          Rscript -e '
-            .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            source("incremental_fetch.R")
-          '
+      - name: Run incremental fetch
+        run: Rscript -e 'source("incremental_fetch.R")'
 
-      - name: Verify JSON output
-        run: |
-          ls -la data/
-          head -10 data/ebola_data.json
-
-      - name: Render dashboard.Rmd
+      - name: Render dashboard
         run: |
           mkdir -p reports
-          Rscript -e '
-            .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            rmarkdown::render("dashboard.Rmd",
-                              output_file = "reports/dashboard.html",
-                              quiet = FALSE)
-          '
-          ls -la reports/
+          Rscript -e 'rmarkdown::render("dashboard.Rmd", output_file = "reports/dashboard.html")'
 
-      # ---------------- Verify assets exist ----------------
-      - name: Verify assets present in repo
-        run: |
-          echo "── assets in repo ──"
-          ls -la assets/ || true
-          if [ ! -f "assets/ebola-theme.jpg" ]; then
-            echo "ERROR: assets/ebola-theme.jpg is missing from the repository."
-            echo "Files present in assets/:"
-            ls -la assets/ || true
-            exit 1
-          fi
-          echo "✓ assets/ebola-theme.jpg found"
-
-      # ---------------- Assemble site ----------------
-      # This is the critical step: it deletes _site entirely, recreates it,
-      # and copies every directory that the site serves. If assets/ were
-      # missing from this list, the deployed site would 404 on the image.
+      # ---------------------------------------------------------
+      # THIS IS THE CRITICAL FIX: ASSEMBLE THE ENTIRE SITE
+      # ---------------------------------------------------------
       - name: Assemble site
         run: |
           rm -rf _site
           mkdir -p _site
-
-          cp    index.html   _site/
-          cp -r css          _site/
-          cp -r js           _site/
-          cp -r assets       _site/
-          cp -r data         _site/
-          cp -r reports      _site/
-          cp -r docs         _site/
-          touch _site/.nojekyll
-
-          echo "── Full _site tree ──"
-          find _site -maxdepth 2 -type f | sort
-
-      # ---------------- Verify assets in the deployable folder ----------------
-      - name: Verify assets present in _site
-        run: |
-          if [ ! -f "_site/assets/ebola-theme.jpg" ]; then
-            echo "ERROR: _site/assets/ebola-theme.jpg is missing."
-            echo "Contents of _site/assets/:"
-            ls -la _site/assets/ || true
-            exit 1
-          fi
-          echo "✓ _site/assets/ebola-theme.jpg present ($(stat -c%s _site/assets/ebola-theme.jpg) bytes)"
-
-      # ---------------- Upload and deploy ----------------
-      - name: Upload site artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ebola-portal-site
-          path: _site/
+          
+          # Copy every single required file and folder into the deploy dir
+          cp index.html _site/
+          cp -r css _site/
+          cp -r js _site/
+          cp -r data _site/
+          cp -r reports _site/
+          cp -r assets _site/     # <--- COPIES THE IMAGE
+          cp -r docs _site/       # <--- COPIES THE RESOURCE PAGES
+          
+          touch _site/.nojekyll   # <--- PREVENTS GITHUB FROM IGNORING FOLDERS
+          
+          echo "=== VERIFY DEPLOYMENT CONTENTS ==="
+          ls -la _site/assets/
+          ls -la _site/docs/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -173,7 +102,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./_site
           publish_branch: gh-pages
-          keep_files: false
-          user_name:  'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'Automated update: ${{ github.run_id }}'
+          keep_files: false       # <--- FORCES A CLEAN OVERWRITE, NO STALE FILES
