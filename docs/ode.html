@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ordinary Differential Equations — Ebola Portal</title>
-    <link rel="stylesheet" href="../css/style.css?v=8">
+    <link rel="stylesheet" href="../css/style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
-<body style="--bg-image: url('../assets/ebola-theme.jpg');">
+<body style="--bg-image: url('../assets/background.jpg');">
 
     <div class="top-marquee">
         <div class="marquee-track">
@@ -23,7 +26,7 @@
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
-                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="../assets/background.jpg" alt="Ebola virus">
             </div>
             <div class="header-title-block">
                 <h1 class="portal-title">Ordinary Differential Equations</h1>
@@ -33,39 +36,74 @@
                 </div>
             </div>
             <div class="virus-icon right-virus" aria-hidden="true">
-                <img src="../assets/ebola-theme.jpg" alt="Ebola virus">
+                <img src="../assets/background.jpg" alt="Ebola virus">
             </div>
         </div>
     </header>
 
     <main class="portal-main">
         <section class="card-row">
-            <h2 class="row-heading">Why ODEs Drive Compartmental Models</h2>
+            <h2 class="row-heading">Understanding ODEs Through Ebola Dynamics</h2>
             <div class="resource-body">
-                <p>An <strong>ordinary differential equation (ODE)</strong> describes how a quantity changes with respect to a single independent variable — in our case, <em>time</em>. Epidemic compartments change continuously, so ODEs are the natural language for describing those flows.</p>
-                <h3 class="resource-subhead">The Basic Idea</h3>
-                <p>An ODE has the form:</p>
-                <pre class="resource-formula">dS/dt = f(S, I, R, D, t)</pre>
-                <p>which reads: "the rate of change of S with respect to time is some function f of the current compartment sizes and time." The SIR model is a system of such equations — one per compartment — solved simultaneously.</p>
-                <h3 class="resource-subhead">An Initial Value Problem</h3>
-                <p>Every ODE system needs <strong>initial conditions</strong>:</p>
-                <pre class="resource-formula">S(0) = S₀    I(0) = I₀    R(0) = 0    D(0) = 0</pre>
-                <p>In this portal, S₀ = N − I₀ where N = 20,000,000 and I₀ is the number of confirmed active cases on the first day of data.</p>
-                <h3 class="resource-subhead">Why There Is No Closed-Form Solution</h3>
-                <p>Unlike simple ODEs from calculus, the SIR system is <strong>nonlinear</strong> (because of the S·I product). There is no analytical formula for S(t), I(t), etc. Therefore we must integrate numerically — which is what the <code>deSolve</code> package in R does.</p>
-                <h3 class="resource-subhead">The Method of Numerical Integration</h3>
-                <p>Numerical solvers step forward in small time increments. At each step they approximate the derivative using the equations and update the state:</p>
-                <pre class="resource-formula">S(t + h) ≈ S(t) + h · f(S(t), t)</pre>
-                <p>Production-grade solvers (like <code>lsoda</code> in <code>deSolve</code>) use adaptive step sizes and higher-order methods for accuracy and stability.</p>
-                <h3 class="resource-subhead">Stiffness and Stability</h3>
-                <p>When compartments differ in scale by many orders of magnitude, the ODE system is called <strong>stiff</strong>. <code>lsoda</code> automatically switches between stiff and non-stiff methods, which is why it is the default in <code>deSolve</code>.</p>
-                <h3 class="resource-subhead">Key Takeaways</h3>
+                
+                <p>Every mathematical model of an infectious disease rests on a fundamental question: <strong>how fast is something changing?</strong> In the case of Ebola, that "something" is the number of susceptible, infected, recovered, and deceased individuals. An <strong>ordinary differential equation</strong> (ODE) is the mathematical tool that describes these rates of change precisely.</p>
+
+                <h3 class="resource-subhead">1. What is an ODE?</h3>
+                <p>An ODE describes how a quantity changes with respect to a single independent variable. In epidemiology, that variable is almost always <em>time</em>. The general form is:</p>
+                <pre class="resource-formula">
+dy/dt = f(y, t)
+                </pre>
+                <p>This reads: "the rate of change of \(y\) with respect to time \(t\) is some function \(f\) of the current value of \(y\) and the current time." If \(y\) is the number of infected people, then \(dy/dt\) is the number of new infections per day minus the number of recoveries and deaths per day.</p>
+
+                <h3 class="resource-subhead">2. Why ODEs Are Central to Compartmental Modelling</h3>
+                <p>Compartmental models divide a population into groups (S, I, R, D) and track the <em>flow</em> of people between them. Each flow is a rate — which is exactly what an ODE expresses. For example, the flow from Susceptible to Infectious is \(\beta S I / N\), the number of new infections per unit time. That becomes the derivative of \(S\) (with a negative sign, since S decreases) and part of the derivative of \(I\) (with a positive sign, since I increases).</p>
+                <p>For Ebola, the SIRD system reads:</p>
+                <pre class="resource-formula">
+dS/dt = −β · S · I / N
+dI/dt =  β · S · I / N − (γ + μ) · I
+dR/dt =  γ · I
+dD/dt =  μ · I
+                </pre>
+                <p>Each line is an ODE. Together, they form a <strong>system of ordinary differential equations</strong>, which is what the <code>deSolve</code> package in R is designed to solve.</p>
+
+                <h3 class="resource-subhead">3. The Concept of Initial Values</h3>
+                <p>An ODE tells us how a quantity changes, but not where it starts. To reconstruct the full trajectory of an Ebola outbreak, we need <strong>initial conditions</strong>:</p>
+                <pre class="resource-formula">
+S(0) = 19,999,995     I(0) = 5     R(0) = 0     D(0) = 0
+                </pre>
+                <p>This is called an <strong>initial value problem</strong> (IVP). The combination of an ODE system and initial conditions uniquely determines the future path of the outbreak.</p>
+
+                <h3 class="resource-subhead">4. Why We Must Solve Numerically</h3>
+                <p>Very few ODE systems have closed-form analytical solutions. The SIRD system is not one of them, because the term \(S \cdot I\) makes it <strong>nonlinear</strong> — the compartments feed back into each other in ways that cannot be simplified algebraically. Instead, we must integrate the system <em>numerically</em>, which means stepping forward in tiny increments of time:</p>
+                <pre class="resource-formula">
+S(t + Δt) ≈ S(t) − Δt · β · S(t) · I(t) / N
+                </pre>
+                <p>This is the <strong>Euler method</strong>. It is the simplest numerical integrator. Production-grade solvers (like <code>lsoda</code>, used by <code>deSolve</code>) use more sophisticated methods that automatically choose the step size, correct for accumulated error, and handle complex situations.</p>
+
+                <h3 class="resource-subhead">5. The Challenge of Stiffness</h3>
+                <p>Epidemic models are frequently <strong>stiff</strong>: the variables change on very different time scales. For example, the susceptible population may be tens of millions while the infected population is only a handful — a ratio of \(10^7\) or more. Stiff systems cause naive solvers to fail or require impossibly tiny time steps.</p>
+                <p>This is why <code>deSolve</code>'s default solver (<code>lsoda</code>) is essential. It automatically detects when a system becomes stiff and switches to an implicit solver (like <code>radau</code>) that can handle the wide range of scales without breaking.</p>
+
+                <h3 class="resource-subhead">6. Relevance to Ebola</h3>
+                <p>In this portal, every time you move the parameter sliders and watch the predictive chart update, you are watching ODEs being solved. The model:</p>
                 <ul class="resource-list">
-                    <li>ODE models describe <em>rates</em>, not amounts.</li>
-                    <li>Initial conditions matter: a different I₀ produces a different entire trajectory.</li>
-                    <li>Numerical integration replaces the analytical solution.</li>
-                    <li>Stiffness is common in epidemic models with large populations.</li>
+                    <li>Sets initial conditions from the first observed Ebola case in the data.</li>
+                    <li>Integrates the SIRD equations forward in time using <code>deSolve</code>.</li>
+                    <li>Compares the model's trajectory to the observed cumulative cases.</li>
+                    <li>Adjusts the coefficients to minimize the difference (using <code>optim()</code>).</li>
+                    <li>Re-integrates forward 14 days to generate the projection.</li>
                 </ul>
+                <p>Without ODEs and numerical integration, none of the predictions, intervention scenarios, or retrospective projections would be possible.</p>
+
+                <h3 class="resource-subhead">7. Key Takeaways</h3>
+                <ul class="resource-list">
+                    <li>ODEs describe <em>rates</em>, not states — the solution yields states over time.</li>
+                    <li>Epidemic models are systems of coupled nonlinear ODEs.</li>
+                    <li>Initial conditions shape the entire outbreak trajectory.</li>
+                    <li>Ebola models are stiff, so adaptive solvers are essential.</li>
+                    <li>Numerical integration replaces the analytical solution in practice.</li>
+                </ul>
+
                 <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
             </div>
         </section>
@@ -73,11 +111,9 @@
 
     <footer class="portal-footer">
         <div class="footer-links">
-            <span>© 2026 Ebola Outbreak Analysis Portal</span>
-            <span class="footer-sep">|</span>
             <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
-            <span class="footer-sep">|</span>
-            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
+            <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare Experience through Technology</a>
+            <span>© 2026 Ebola Outbreak Analysis Portal • Powered by SIR Statistical Modelling</span>
         </div>
     </footer>
 
