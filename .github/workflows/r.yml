@@ -22,9 +22,11 @@ jobs:
       R_LIBS_USER: ${{ github.workspace }}/.Rlib
 
     steps:
+      # ---------------- Checkout ----------------
       - name: Checkout workspace
         uses: actions/checkout@v4
 
+      # ---------------- Fetch upstream tracker ----------------
       - name: Fetch upstream tracker data
         uses: actions/checkout@v4
         with:
@@ -39,6 +41,7 @@ jobs:
           ls -la downloaded_timeseries.csv
           head -3 downloaded_timeseries.csv
 
+      # ---------------- R + Pandoc ----------------
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
@@ -48,6 +51,7 @@ jobs:
       - name: Setup Pandoc
         uses: r-lib/actions/setup-pandoc@v2
 
+      # ---------------- System libraries ----------------
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -56,6 +60,7 @@ jobs:
             libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
             libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
 
+      # ---------------- R library ----------------
       - name: Prepare R library directory
         run: |
           mkdir -p "$R_LIBS_USER"
@@ -86,6 +91,7 @@ jobs:
             cat("All required R packages available.\n")
           '
 
+      # ---------------- Analysis ----------------
       - name: Run incremental fetch and export JSON
         run: |
           Rscript -e '
@@ -96,10 +102,7 @@ jobs:
       - name: Verify JSON output
         run: |
           ls -la data/
-          echo "=== generated_at ==="
-          grep generated_at data/ebola_data.json
-          echo "=== rows in cache ==="
-          wc -l data_cache.csv
+          head -10 data/ebola_data.json
 
       - name: Render dashboard.Rmd
         run: |
@@ -112,20 +115,52 @@ jobs:
           '
           ls -la reports/
 
+      # ---------------- Verify assets exist ----------------
+      - name: Verify assets present in repo
+        run: |
+          echo "── assets in repo ──"
+          ls -la assets/ || true
+          if [ ! -f "assets/ebola-theme.jpg" ]; then
+            echo "ERROR: assets/ebola-theme.jpg is missing from the repository."
+            echo "Files present in assets/:"
+            ls -la assets/ || true
+            exit 1
+          fi
+          echo "✓ assets/ebola-theme.jpg found"
+
+      # ---------------- Assemble site ----------------
+      # This is the critical step: it deletes _site entirely, recreates it,
+      # and copies every directory that the site serves. If assets/ were
+      # missing from this list, the deployed site would 404 on the image.
       - name: Assemble site
         run: |
           rm -rf _site
           mkdir -p _site
-          cp    index.html _site/
-          cp -r css        _site/
-          cp -r js         _site/
-          cp -r assets     _site/ 2>/dev/null || true
-          cp -r reports    _site/
-          rm -rf _site/data
-          cp -r data       _site/
-          cp -r docs       _site/
+
+          cp    index.html   _site/
+          cp -r css          _site/
+          cp -r js           _site/
+          cp -r assets       _site/
+          cp -r data         _site/
+          cp -r reports      _site/
+          cp -r docs         _site/
           touch _site/.nojekyll
 
+          echo "── Full _site tree ──"
+          find _site -maxdepth 2 -type f | sort
+
+      # ---------------- Verify assets in the deployable folder ----------------
+      - name: Verify assets present in _site
+        run: |
+          if [ ! -f "_site/assets/ebola-theme.jpg" ]; then
+            echo "ERROR: _site/assets/ebola-theme.jpg is missing."
+            echo "Contents of _site/assets/:"
+            ls -la _site/assets/ || true
+            exit 1
+          fi
+          echo "✓ _site/assets/ebola-theme.jpg present ($(stat -c%s _site/assets/ebola-theme.jpg) bytes)"
+
+      # ---------------- Upload and deploy ----------------
       - name: Upload site artifact
         uses: actions/upload-artifact@v4
         with:
