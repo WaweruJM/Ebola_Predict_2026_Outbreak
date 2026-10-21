@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analysis Workflow in R — Ebola Portal</title>
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/style.css?v=8">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body style="--bg-image: url('../assets/ebola-theme.jpg');">
@@ -42,100 +42,39 @@
         <section class="card-row">
             <h2 class="row-heading">The Daily Pipeline, Step by Step</h2>
             <div class="resource-body">
-                <p>
-                    This portal is not manually updated. Every day at 05:00 UTC, a GitHub Actions
-                    workflow pulls the latest upstream data, runs the SIR model, exports a JSON file,
-                    renders an R Markdown report, and publishes the whole site to GitHub Pages.
-                    Here is the entire workflow explained.
-                </p>
-
+                <p>This portal is not manually updated. Every day at 05:00 UTC, a GitHub Actions workflow pulls the latest upstream data, runs the SIR model, exports a JSON file, renders an R Markdown report, and publishes the whole site to GitHub Pages. Here is the entire workflow explained.</p>
                 <h3 class="resource-subhead">Step 1 — Data Preparation</h3>
-                <p>
-                    The upstream repository
-                    (<code>webbegole/ebola-bundibugyo-tracker-2026</code>) publishes a CSV of daily
-                    case reports. The workflow clones that repository to a temporary folder and copies
-                    <code>data/timeseries.csv</code> into the workspace. All further analysis is
-                    done against that snapshot — no external API calls, fully reproducible.
-                </p>
-
+                <p>The upstream repository (<code>webbegole/ebola-bundibugyo-tracker-2026</code>) publishes a CSV of daily case reports. The workflow clones that repository and copies <code>data/timeseries.csv</code> into the workspace.</p>
                 <h3 class="resource-subhead">Step 2 — Data Wrangling</h3>
-                <p>
-                    The raw CSV contains cumulative confirmed cases, confirmed deaths, and recoveries.
-                    The R script cleans the data:
-                </p>
                 <ul class="resource-list">
                     <li>Parses dates unambiguously.</li>
-                    <li>Normalises column names (lowercase, snake_case).</li>
-                    <li>Removes duplicate daily rows, keeping the one with the most recent source timestamp.</li>
+                    <li>Normalises column names.</li>
+                    <li>Removes duplicate daily rows.</li>
                     <li>Computes derived columns: active cases, case fatality rate, daily incidence.</li>
                 </ul>
-                <p>
-                    Only <strong>confirmed cases</strong> are used in modelling. Suspected cases are
-                    excluded because their reporting is far more variable across sources.
-                </p>
-
+                <p>Only <strong>confirmed cases</strong> are used in modelling. Suspected cases are excluded because their reporting is far more variable.</p>
                 <h3 class="resource-subhead">Step 3 — Parameter Estimation</h3>
-                <p>
-                    The SIR parameters (β, γ, μ) are estimated by <strong>non-linear least squares</strong>.
-                    The objective function is:
-                </p>
+                <p>The SIR parameters (β, γ, μ) are estimated by <strong>non-linear least squares</strong>. The objective function is:</p>
                 <pre class="resource-formula">SSE(β, γ, I₀) = Σ [observed_cumulative(t) − predicted_cumulative(t)]²</pre>
-                <p>
-                    where the model's cumulative output is <code>I(t) + R(t) + D(t)</code>.
-                    The optimisation uses <code>optim(method = "L-BFGS-B")</code> with logarithmic
-                    reparameterisation to enforce positivity and box constraints to prevent
-                    physically impossible estimates.
-                </p>
-
+                <p>where the model's cumulative output is <code>I(t) + R(t) + D(t)</code>. The optimisation uses <code>optim(method = "L-BFGS-B")</code> with logarithmic reparameterisation to enforce positivity and box constraints to prevent impossible estimates.</p>
                 <h3 class="resource-subhead">Step 4 — Train / Test Split</h3>
-                <p>
-                    The observation window is divided chronologically:
-                </p>
                 <ul class="resource-list">
                     <li><strong>Training (first 80 %):</strong> Used to fit β, γ, and I₀.</li>
                     <li><strong>Testing (last 20 %):</strong> Held out entirely. The fitted model is evaluated on this window to measure predictive skill on data it has never seen.</li>
                 </ul>
-                <p>
-                    This is essential for honest performance metrics. A model that fits only
-                    its training data is useless — the test window reveals whether the estimated
-                    parameters generalise.
-                </p>
-
                 <h3 class="resource-subhead">Step 5 — Model Performance</h3>
-                <p>Three metrics are reported for each window:</p>
                 <ul class="resource-list">
-                    <li><strong>RMSE</strong> — Root Mean Squared Error. Penalises large errors; same units as the data.</li>
-                    <li><strong>MAE</strong> — Mean Absolute Error. Average absolute deviation; easier to interpret.</li>
-                    <li><strong>R²</strong> — Coefficient of determination. Fraction of variance explained; 1 is perfect, 0 is no better than the mean, negative means worse than the mean.</li>
+                    <li><strong>RMSE</strong> — Root Mean Squared Error.</li>
+                    <li><strong>MAE</strong> — Mean Absolute Error.</li>
+                    <li><strong>R²</strong> — Coefficient of determination.</li>
                 </ul>
-
                 <h3 class="resource-subhead">Step 6 — Projection</h3>
-                <p>
-                    Once parameters are estimated, the ODE system is re-anchored at the state of the
-                    last observation and integrated forward for <strong>14 days</strong>. Anchoring
-                    at the last observed state guarantees the projection begins exactly where the
-                    data ends, with no visible discontinuity.
-                </p>
-
+                <p>Once parameters are estimated, the ODE system is re-anchored at the state of the last observation and integrated forward for <strong>14 days</strong>.</p>
                 <h3 class="resource-subhead">Step 7 — Export and Deploy</h3>
-                <p>
-                    The script writes <code>data/ebola_data.json</code> containing all cards, chart
-                    series, coefficients, zones, and slider defaults. The R Markdown report is
-                    rendered to <code>reports/dashboard.html</code>. The workflow then assembles
-                    the deployable site, publishes it to the <code>gh-pages</code> branch, and
-                    GitHub Pages serves the new version within a minute.
-                </p>
-
-                <h3 class="resource-subhead">Reproducibility Guarantees</h3>
-                <ul class="resource-list">
-                    <li>The upstream data snapshot is fetched fresh every run.</li>
-                    <li>R packages are installed from a locked, cached library.</li>
-                    <li>The JSON output is deterministic given the same input CSV.</li>
-                    <li>Every artefact is versioned in the repository history.</li>
-                </ul>
-
+                <p>The script writes <code>data/ebola_data.json</code>. The R Markdown report is rendered to <code>reports/dashboard.html</code>. The workflow assembles the deployable site and publishes it to the <code>gh-pages</code> branch.</p>
                 <h3 class="resource-subhead">How to Reproduce Locally</h3>
-                <pre class="resource-formula"># 1. Fetch the latest upstream data
+                <pre class="resource-formula">
+# 1. Fetch the latest upstream data
 git clone https://github.com/webbegole/ebola-bundibugyo-tracker-2026
 cp ebola-bundibugyo-tracker-2026/data/timeseries.csv ./downloaded_timeseries.csv
 
@@ -143,13 +82,10 @@ cp ebola-bundibugyo-tracker-2026/data/timeseries.csv ./downloaded_timeseries.csv
 Rscript incremental_fetch.R
 
 # 3. Render the report
-Rscript -e 'rmarkdown::render("dashboard.Rmd",
-            output_file = "reports/dashboard.html")'
+Rscript -e 'rmarkdown::render("dashboard.Rmd", output_file = "reports/dashboard.html")'
 
 # 4. Serve the portal
 python3 -m http.server 8000</pre>
-                <p>Then open <code>http://localhost:8000</code> in your browser.</p>
-
                 <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
             </div>
         </section>
@@ -158,9 +94,9 @@ python3 -m http.server 8000</pre>
     <footer class="portal-footer">
         <div class="footer-links">
             <span>© 2026 Ebola Outbreak Analysis Portal</span>
-            <span>|</span>
+            <span class="footer-sep">|</span>
             <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
-            <span>|</span>
+            <span class="footer-sep">|</span>
             <a href="https://medalsanalytica.com" target="_blank" rel="noopener">Improving Healthcare with Technology</a>
         </div>
     </footer>
