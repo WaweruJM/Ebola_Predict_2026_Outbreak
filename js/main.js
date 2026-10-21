@@ -306,4 +306,43 @@ function updateCharts() {
         pc.update('none');
     }
 
-    const cc = charts.co
+    const cc = charts.coeffChart;
+    if (cc) {
+        cc.data.datasets[0].data = cc.data.datasets[0].data.map(() => +beta.toFixed(3));
+        cc.data.datasets[1].data = cc.data.datasets[1].data.map(() => +gamma.toFixed(3));
+        cc.data.datasets[2].data = cc.data.datasets[2].data.map(() => +mu.toFixed(3));
+        cc.update('none');
+    }
+}
+
+async function loadData() {
+    try {
+        const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        DATA = await res.json();
+    } catch (err) {
+        console.warn('Could not load fresh data.', err);
+        DATA = { case_telemetry: [], bio_coefficients: [], chart_series: { months: [], confirmed_observed: [], recovered_observed: [], deaths_observed: [], seir_fitted_I: [], projection_dates: [], projection_I: [], sir_I: [], sir_R: [], sir_D: [], coeff_beta: [], coeff_gamma: [], coeff_mu: [] }, zones: [], sliders: [], primary_parameters: {}, performance: {} };
+    }
+}
+
+async function init() {
+    await loadData();
+    
+    // Inject Last Refreshed Date into Header
+    if (DATA.generated_at) {
+        const refreshEl = document.getElementById('header-refresh-time');
+        if (refreshEl) {
+            const d = new Date(DATA.generated_at);
+            refreshEl.textContent = `Last Data Refresh: ${d.toLocaleString()}`;
+        }
+    }
+
+    renderCards('caseTelemetryCards', DATA.case_telemetry);
+    renderCards('bioCoeffCards', DATA.bio_coefficients);
+    renderSliders();
+    buildCharts();
+    $('#resetBtn').addEventListener('click', resetSliders);
+}
+
+document.addEventListener('DOMContentLoaded', init);
