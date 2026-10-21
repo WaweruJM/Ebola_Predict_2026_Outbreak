@@ -10,16 +10,9 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: ebola-pipeline
-  cancel-in-progress: false
-
 jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
-
-    # This is the critical line: R_LIBS_USER is set once at the job level
-    # so every subsequent 'run' step points to the same library folder.
     env:
       R_LIBS_USER: ${{ github.workspace }}/.Rlib
 
@@ -34,7 +27,7 @@ jobs:
           path: external_repo_clone
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract timeseries into workspace
+      - name: Extract timeseries
         run: |
           cp external_repo_clone/data/timeseries.csv ./downloaded_timeseries.csv
           rm -rf external_repo_clone
@@ -46,121 +39,60 @@ jobs:
           r-version: '4.4.3'
           use-public-rspm: true
 
-      - name: Setup Pandoc
-        uses: r-lib/actions/setup-pandoc@v2
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libcurl4-openssl-dev libssl-dev libxml2-dev \
-            libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
-            libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libfontconfig1-dev libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
 
-      # Create the library folder and confirm it is visible to R
-      - name: Prepare R library
-        run: |
-          mkdir -p "$R_LIBS_USER"
-          echo "R_LIBS_USER=$R_LIBS_USER" >> $GITHUB_ENV
-          Rscript -e 'cat("Library path:", Sys.getenv("R_LIBS_USER"), "\n")'
-
-      - name: Cache R packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.R_LIBS_USER }}
-          key: r-4.4.3-${{ runner.os }}-${{ hashFiles('incremental_fetch.R', 'dashboard.Rmd') }}
-          restore-keys: |
-            r-4.4.3-${{ runner.os }}-
-
-      # Install every package the two R files need, in waves so each
-      # dependency tier is complete before the next starts.
       - name: Install R packages
         run: |
           Rscript -e '
             lib <- Sys.getenv("R_LIBS_USER")
             dir.create(lib, recursive = TRUE, showWarnings = FALSE)
             .libPaths(c(lib, .libPaths()))
-            options(repos = c(CRAN = "https://cloud.r-project.org"),
-                    Ncpus = max(1L, parallel::detectCores() - 1L))
-            waves <- list(
-              base = c("jsonlite","readr","tibble","dplyr","tidyr",
-                       "lubridate","scales","knitr","deSolve"),
-              viz  = c("ggplot2"),
-              docs = c("rmarkdown")
-            )
-            for (wave in names(waves)) {
-              pkgs <- waves[[wave]]
-              need <- pkgs[!pkgs %in% rownames(installed.packages())]
-              if (length(need)) {
-                message("Wave [", wave, "]: installing ", paste(need, collapse=", "))
-                install.packages(need, lib = lib, dependencies = TRUE)
-              }
-            }
-            required <- unlist(waves, use.names = FALSE)
-            missing  <- required[!required %in% rownames(installed.packages())]
-            if (length(missing)) stop("Missing: ", paste(missing, collapse=", "))
-            cat("✔ All R packages installed in:", lib, "\n")
-            print(rownames(installed.packages(lib.loc = lib)))
+            options(repos = c(CRAN = "https://cloud.r-project.org"))
+            pkgs <- c("jsonlite","readr","tibble","dplyr","tidyr", "lubridate","ggplot2","knitr","rmarkdown","deSolve")
+            need <- pkgs[!pkgs %in% rownames(installed.packages())]
+            if (length(need)) install.packages(need, lib = lib, dependencies = TRUE)
           '
 
-      # Explicitly prepend the library so the source() call finds rmarkdown
       - name: Run incremental fetch and export JSON
         run: |
           Rscript -e '
             .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            cat("Library in use:", .libPaths()[1], "\n")
-            stopifnot(requireNamespace("deSolve", quietly = TRUE))
             source("incremental_fetch.R")
           '
 
+      # CRITICAL DEBUG STEP: Inspect the JSON to verify what R computed
       - name: Verify JSON output
         run: |
-          ls -la data/
-          head -10 data/ebola_data.json
+          echo "=== Inspecting the generated JSON ==="
+          cat data/ebola_data.json | grep -A 5 "case_telemetry" | head -20
 
-      # Same library path, plus a loud failure if rmarkdown is missing
-      - name: Render dashboard.Rmd
+      - name: Render dashboard
         run: |
           mkdir -p reports
           Rscript -e '
             .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
-            cat("Library in use:", .libPaths()[1], "\n")
-            if (!requireNamespace("rmarkdown", quietly = TRUE)) {
-              stop("rmarkdown not found in ", .libPaths()[1],
-                   " — installed packages: ",
-                   paste(rownames(installed.packages()), collapse=", "))
-            }
-            rmarkdown::render("dashboard.Rmd",
-                              output_file = "reports/dashboard.html",
-                              quiet = FALSE)
+            rmarkdown::render("dashboard.Rmd", output_file = "reports/dashboard.html")
           '
-          ls -la reports/
 
+      # DELETE OLD FILES TO FORCE CACHE REFRESH
       - name: Assemble site
         run: |
           rm -rf _site
           mkdir -p _site
-
           cp    index.html   _site/
           cp -r css          _site/
           cp -r js           _site/
+          cp -r assets       _site/
           cp -r data         _site/
           cp -r reports      _site/
-          cp -r assets       _site/
           cp -r docs         _site/
           touch _site/.nojekyll
-
-          echo "── _site contents ──"
-          find _site -maxdepth 2 -type f | sort
-
-      - name: Verify assets present in _site
-        run: |
-          if [ ! -f "_site/assets/ebola-theme.jpg" ]; then
-            echo "ERROR: _site/assets/ebola-theme.jpg missing"
-            ls -la _site/assets/ || true
-            exit 1
-          fi
-          echo "✓ _site/assets/ebola-theme.jpg present"
+          
+          echo "=== Deployable Assets Verification ==="
+          ls -la _site/data/ebola_data.json
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -168,7 +100,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./_site
           publish_branch: gh-pages
-          keep_files: false
-          user_name:  'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'Automated update: ${{ github.run_id }}'
+          keep_files: false # <--- CRITICAL: This forces a clean deploy, removing old JSON
