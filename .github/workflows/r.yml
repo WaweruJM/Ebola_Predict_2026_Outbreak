@@ -18,6 +18,11 @@ jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
 
+    # This is the critical line: R_LIBS_USER is set once at the job level
+    # so every subsequent 'run' step points to the same library folder.
+    env:
+      R_LIBS_USER: ${{ github.workspace }}/.Rlib
+
     steps:
       - name: Checkout workspace
         uses: actions/checkout@v4
@@ -33,6 +38,7 @@ jobs:
         run: |
           cp external_repo_clone/data/timeseries.csv ./downloaded_timeseries.csv
           rm -rf external_repo_clone
+          ls -la downloaded_timeseries.csv
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
@@ -51,6 +57,23 @@ jobs:
             libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
             libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
 
+      # Create the library folder and confirm it is visible to R
+      - name: Prepare R library
+        run: |
+          mkdir -p "$R_LIBS_USER"
+          echo "R_LIBS_USER=$R_LIBS_USER" >> $GITHUB_ENV
+          Rscript -e 'cat("Library path:", Sys.getenv("R_LIBS_USER"), "\n")'
+
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-4.4.3-${{ runner.os }}-${{ hashFiles('incremental_fetch.R', 'dashboard.Rmd') }}
+          restore-keys: |
+            r-4.4.3-${{ runner.os }}-
+
+      # Install every package the two R files need, in waves so each
+      # dependency tier is complete before the next starts.
       - name: Install R packages
         run: |
           Rscript -e '
@@ -59,42 +82,85 @@ jobs:
             .libPaths(c(lib, .libPaths()))
             options(repos = c(CRAN = "https://cloud.r-project.org"),
                     Ncpus = max(1L, parallel::detectCores() - 1L))
-            pkgs <- c("jsonlite","readr","tibble","dplyr","tidyr",
-                      "lubridate","ggplot2","knitr","rmarkdown","deSolve")
-            need <- pkgs[!pkgs %in% rownames(installed.packages())]
-            if (length(need)) install.packages(need, lib = lib, dependencies = TRUE)
+            waves <- list(
+              base = c("jsonlite","readr","tibble","dplyr","tidyr",
+                       "lubridate","scales","knitr","deSolve"),
+              viz  = c("ggplot2"),
+              docs = c("rmarkdown")
+            )
+            for (wave in names(waves)) {
+              pkgs <- waves[[wave]]
+              need <- pkgs[!pkgs %in% rownames(installed.packages())]
+              if (length(need)) {
+                message("Wave [", wave, "]: installing ", paste(need, collapse=", "))
+                install.packages(need, lib = lib, dependencies = TRUE)
+              }
+            }
+            required <- unlist(waves, use.names = FALSE)
+            missing  <- required[!required %in% rownames(installed.packages())]
+            if (length(missing)) stop("Missing: ", paste(missing, collapse=", "))
+            cat("✔ All R packages installed in:", lib, "\n")
+            print(rownames(installed.packages(lib.loc = lib)))
           '
 
-      - name: Run incremental fetch
-        run: Rscript -e 'source("incremental_fetch.R")'
+      # Explicitly prepend the library so the source() call finds rmarkdown
+      - name: Run incremental fetch and export JSON
+        run: |
+          Rscript -e '
+            .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
+            cat("Library in use:", .libPaths()[1], "\n")
+            stopifnot(requireNamespace("deSolve", quietly = TRUE))
+            source("incremental_fetch.R")
+          '
 
-      - name: Render dashboard
+      - name: Verify JSON output
+        run: |
+          ls -la data/
+          head -10 data/ebola_data.json
+
+      # Same library path, plus a loud failure if rmarkdown is missing
+      - name: Render dashboard.Rmd
         run: |
           mkdir -p reports
-          Rscript -e 'rmarkdown::render("dashboard.Rmd", output_file = "reports/dashboard.html")'
+          Rscript -e '
+            .libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
+            cat("Library in use:", .libPaths()[1], "\n")
+            if (!requireNamespace("rmarkdown", quietly = TRUE)) {
+              stop("rmarkdown not found in ", .libPaths()[1],
+                   " — installed packages: ",
+                   paste(rownames(installed.packages()), collapse=", "))
+            }
+            rmarkdown::render("dashboard.Rmd",
+                              output_file = "reports/dashboard.html",
+                              quiet = FALSE)
+          '
+          ls -la reports/
 
-      # ---------------------------------------------------------
-      # THIS IS THE CRITICAL FIX: ASSEMBLE THE ENTIRE SITE
-      # ---------------------------------------------------------
       - name: Assemble site
         run: |
           rm -rf _site
           mkdir -p _site
-          
-          # Copy every single required file and folder into the deploy dir
-          cp index.html _site/
-          cp -r css _site/
-          cp -r js _site/
-          cp -r data _site/
-          cp -r reports _site/
-          cp -r assets _site/     # <--- COPIES THE IMAGE
-          cp -r docs _site/       # <--- COPIES THE RESOURCE PAGES
-          
-          touch _site/.nojekyll   # <--- PREVENTS GITHUB FROM IGNORING FOLDERS
-          
-          echo "=== VERIFY DEPLOYMENT CONTENTS ==="
-          ls -la _site/assets/
-          ls -la _site/docs/
+
+          cp    index.html   _site/
+          cp -r css          _site/
+          cp -r js           _site/
+          cp -r data         _site/
+          cp -r reports      _site/
+          cp -r assets       _site/
+          cp -r docs         _site/
+          touch _site/.nojekyll
+
+          echo "── _site contents ──"
+          find _site -maxdepth 2 -type f | sort
+
+      - name: Verify assets present in _site
+        run: |
+          if [ ! -f "_site/assets/ebola-theme.jpg" ]; then
+            echo "ERROR: _site/assets/ebola-theme.jpg missing"
+            ls -la _site/assets/ || true
+            exit 1
+          fi
+          echo "✓ _site/assets/ebola-theme.jpg present"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -102,4 +168,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./_site
           publish_branch: gh-pages
-          keep_files: false       # <--- FORCES A CLEAN OVERWRITE, NO STALE FILES
+          keep_files: false
+          user_name:  'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Automated update: ${{ github.run_id }}'
