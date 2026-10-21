@@ -317,15 +317,23 @@ function updateCharts() {
 
 async function loadData() {
     try {
-        const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
+        // Generate a unique timestamp to append to the URL
+        const cacheBuster = new Date().getTime();
+        const res = await fetch(`${DATA_URL}?v=${cacheBuster}`, { 
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         DATA = await res.json();
     } catch (err) {
         console.warn('Could not load fresh data.', err);
-        DATA = { case_telemetry: [], bio_coefficients: [], chart_series: { months: [], confirmed_observed: [], recovered_observed: [], deaths_observed: [], seir_fitted_I: [], projection_dates: [], projection_I: [], sir_I: [], sir_R: [], sir_D: [], coeff_beta: [], coeff_gamma: [], coeff_mu: [] }, zones: [], sliders: [], primary_parameters: {}, performance: {} };
+        // ... fallback data ...
     }
 }
-
 async function init() {
     await loadData();
     
