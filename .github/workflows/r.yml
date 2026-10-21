@@ -65,14 +65,24 @@ jobs:
             lib <- Sys.getenv("R_LIBS_USER")
             dir.create(lib, recursive = TRUE, showWarnings = FALSE)
             .libPaths(c(lib, .libPaths()))
-            options(repos = c(CRAN = "https://cloud.r-project.org"),
-                    Ncpus = max(1L, parallel::detectCores() - 1L))
-            pkgs <- c("jsonlite","readr","tibble","dplyr","tidyr",
-                      "lubridate","ggplot2","knitr","rmarkdown","deSolve")
+            
+            # Use Posit Package Manager for pre-compiled Ubuntu binaries
+            options(repos = c(
+              P3M = "https://packagemanager.posit.co/cran/__linux__/noble/latest"
+            ))
+            
+            # Only install what is strictly required
+            pkgs <- c("jsonlite", "readr", "tibble", "dplyr", "tidyr",
+                      "lubridate", "ggplot2", "knitr", "rmarkdown", "deSolve")
+            
             need <- pkgs[!pkgs %in% rownames(installed.packages())]
-            if (length(need)) install.packages(need, lib = lib, dependencies = TRUE)
+            if (length(need)) {
+              install.packages(need, lib = lib, dependencies = c("Depends", "Imports"))
+            }
+            
             missing <- pkgs[!pkgs %in% rownames(installed.packages())]
             if (length(missing)) stop("Missing: ", paste(missing, collapse = ", "))
+            cat("All required packages installed successfully.\n")
           '
 
       - name: Run incremental fetch and export JSON
