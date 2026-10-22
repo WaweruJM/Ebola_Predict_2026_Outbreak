@@ -46,76 +46,82 @@
             <h2 class="row-heading">The Daily Pipeline, Step by Step</h2>
             <div class="resource-body">
                 
-                <p>This portal is not manually updated. Every day at 05:00 UTC, an automated GitHub Actions workflow pulls the latest upstream data, runs a complete SIRD analysis, writes a JSON file consumed by the front-end, and deploys the whole site to GitHub Pages. This document explains every step and the statistical reasoning behind it.</p>
+                <p>This portal is automatically updated. Every day at 05:00 UTC, a GitHub Actions workflow pulls the latest upstream data, runs a complete intervention-aware SIRD analysis, writes a JSON file consumed by the interactive front-end, and deploys the whole site to GitHub Pages. This document explains every step and the statistical reasoning behind it.</p>
 
                 <h3 class="resource-subhead">Step 1 — Data Acquisition</h3>
                 <p>The upstream repository (<code>webbegole/ebola-bundibugyo-tracker-2026</code>) maintains a CSV of daily case reports. The workflow clones that repository to a temporary folder and copies <code>data/timeseries.csv</code> into the working directory. This guarantees that every analysis starts from the exact same data snapshot that other researchers can verify.</p>
-                <p>The columns used are:</p>
+                <p>Columns used:</p>
                 <ul class="resource-list">
-                    <li><code>report_date</code> — the calendar date of the report.</li>
+                    <li><code>report_date</code> — calendar date of the report.</li>
                     <li><code>confirmed_global</code> — cumulative confirmed cases.</li>
                     <li><code>confirmed_deaths_global</code> — cumulative confirmed deaths.</li>
                     <li><code>recovered_global</code> — cumulative recoveries.</li>
                 </ul>
 
                 <h3 class="resource-subhead">Step 2 — Data Wrangling and Quality Control</h3>
-                <p>The raw CSV is cleaned to ensure that downstream modelling is not contaminated by duplicates or missing values:</p>
                 <ul class="resource-list">
-                    <li><strong>Date parsing</strong> — all dates are coerced to R's <code>Date</code> type with a common format.</li>
-                    <li><strong>Column normalization</strong> — names are lowercased and standardised.</li>
-                    <li><strong>Duplicate removal</strong> — when the same date appears multiple times, the row with the most recent <code>source_timestamp</code> is kept.</li>
-                    <li><strong>Derived columns</strong> — the model computes active cases (confirmed − deaths − recovered), CFR (100 × deaths / confirmed), and daily incidence (the difference in cumulative cases day-over-day).</li>
+                    <li><strong>Date parsing</strong> — dates coerced to R's <code>Date</code> type.</li>
+                    <li><strong>Column normalization</strong> — names lowercased and standardized.</li>
+                    <li><strong>Duplicate removal</strong> — when the same date appears twice, the row with the latest <code>source_timestamp</code> is kept.</li>
+                    <li><strong>Derived columns</strong> — active cases (confirmed − deaths − recovered), CFR (100 × deaths / confirmed), and daily incidence (day-over-day differences).</li>
                 </ul>
                 <p>Only <strong>confirmed</strong> cases are modelled. Suspected cases are excluded because reporting practices for suspected cases vary widely between sources, which would introduce systematic bias into the coefficient estimates.</p>
 
-                <h3 class="resource-subhead">Step 3 — Parameter Estimation</h3>
-                <p>The three biological coefficients — transmission (\(\beta\)), recovery (\(\gamma\)), and mortality (\(\mu\)) — are estimated by <strong>non-linear least squares</strong>. The objective function is:</p>
+                <h3 class="resource-subhead">Step 3 — Parameter Estimation with Interventions</h3>
+                <p>The model now estimates <strong>five</strong> parameters, not three:</p>
+                <ul class="resource-list">
+                    <li>\(\beta_0\) — initial transmission rate (before interventions).</li>
+                    <li>\(\gamma\) — recovery rate.</li>
+                    <li>\(\mu\) — mortality rate.</li>
+                    <li>\(k\) — intervention decay rate.</li>
+                    <li>\(\tau_{\text{start}}\) — intervention start day (from first case).</li>
+                </ul>
+                <p>The estimation uses <strong>non-linear least squares</strong> with the objective function:</p>
                 <pre class="resource-formula">
-SSE(β, γ, I₀) = Σ [observed_cumulative(t) − predicted_cumulative(t)]²
+SSE(β0, γ, μ, k, τ, I0) = Σ [observed_cumulative(t) − predicted_cumulative(t)]²
                 </pre>
-                <p>where the model's cumulative output is <code>I(t) + R(t) + D(t)</code>. The optimizer is <code>optim()</code> with the <code>L-BFGS-B</code> method, which allows box constraints on the parameters. Log-reparameterization guarantees that all proposed values are positive.</p>
-                <p>The fitted coefficients in the latest run are written to the JSON file and displayed in the "Biological Coefficients" cards of the portal.</p>
+                <p>where <code>predicted_cumulative</code> is \(I(t) + R(t) + D(t)\) from the SIRD integration with \(\beta(t) = \beta_0 e^{-k(t-\tau)}\). The optimizer is <code>optim()</code> with <code>L-BFGS-B</code>, and parameters are log-reparameterized to enforce positivity. The intervention parameters are derived directly from the observed slowdown — the model figures out <em>when</em> the curve started to bend and <em>how fast</em> it bent.</p>
 
                 <h3 class="resource-subhead">Step 4 — Train / Test Split</h3>
                 <p>The observation window is split chronologically:</p>
                 <ul class="resource-list">
-                    <li><strong>Training window (first 80%):</strong> used to fit \(\beta, \gamma, \mu\) and the initial infectious count \(I_0\).</li>
-                    <li><strong>Test window (last 20%):</strong> held out entirely. The fitted model is evaluated on this window to measure predictive skill on data it has never seen.</li>
+                    <li><strong>Training window (first 80%):</strong> used to fit all five parameters plus \(I_0\).</li>
+                    <li><strong>Test window (last 20%):</strong> held out entirely. The fitted model is evaluated on data it has never seen.</li>
                 </ul>
-                <p>This split is essential. A model that fits only its training data is meaningless. The test window is the closest available proxy for "would this model have predicted the near future correctly?" — which is the primary use case in a real outbreak response.</p>
+                <p>This split is essential. A model that fits only its training data tells you nothing about real-world predictive skill. The test window is the closest available proxy for "would this model have predicted the near future correctly?" — which is precisely the use case in a real outbreak.</p>
 
                 <h3 class="resource-subhead">Step 5 — Statistical Validation</h3>
-                <p>Three validation metrics are computed on both windows:</p>
+                <p>Three metrics are computed on both windows:</p>
                 <ul class="resource-list">
-                    <li><strong>RMSE</strong> — Root Mean Squared Error. Penalises large errors; reported in the same units as the case counts.</li>
-                    <li><strong>MAE</strong> — Mean Absolute Error. Average absolute deviation; easier to interpret for non-specialists.</li>
-                    <li><strong>R²</strong> — Coefficient of determination. Fraction of variance explained; 1 is perfect, 0 is no better than the mean, and <em>negative values mean the model is worse than predicting a constant</em>.</li>
+                    <li><strong>RMSE</strong> — Root Mean Squared Error; penalizes large errors; reported in same units as cases.</li>
+                    <li><strong>MAE</strong> — Mean Absolute Error; average absolute deviation; easier for non-specialists to interpret.</li>
+                    <li><strong>R²</strong> — Coefficient of determination; 1 is perfect, 0 is no better than the mean, <em>negative values mean the model is worse than predicting a constant</em>.</li>
                 </ul>
-                <p>These metrics are displayed in the "Model Performance" box on the predictive chart, so readers can judge for themselves how much confidence to place in the forecast.</p>
+                <p>A well-fitted intervention-aware model should have a positive training R² (typically above 0.8) and a test R² that does not collapse to strongly negative. If the test R² is much worse than the training R², the model is overfitting and the projection should be treated with caution.</p>
 
-                <h3 class="resource-subhead">Step 6 — Projection</h3>
-                <p>Once parameters are estimated, the SIRD system is re-anchored at the state of the last observation and integrated forward for 14 days. Anchoring is critical: without it, the projection can jump discontinuously at the boundary between data and forecast.</p>
-                <p>The projected curve is therefore guaranteed to begin exactly where the observed curve ends — a small but crucial detail that distinguishes a professionally presented forecast from an unreliable one.</p>
+                <h3 class="resource-subhead">Step 6 — Anchored Projection</h3>
+                <p>Once parameters are estimated, the SIRD system is re-anchored at the state of the <em>last observation</em> and integrated forward for 14 days. The β(t) decay <em>continues</em> into the projection — the model does not assume interventions suddenly stop.
+
+                Anchoring is critical. If the projection simply continued from the model's fitted state on the last training day, it could jump discontinuously at the boundary. Anchoring guarantees visual continuity between the observed curve and the forecast.</p>
 
                 <h3 class="resource-subhead">Step 7 — Report and Deployment</h3>
                 <p>The analysis produces three artefacts:</p>
                 <ul class="resource-list">
                     <li><code>data/ebola_data.json</code> — structured output consumed by the portal's interactive charts.</li>
-                    <li><code>reports/dashboard.html</code> — a self-contained R Markdown report with all tables and static charts.</li>
+                    <li><code>reports/dashboard.html</code> — a self-contained R Markdown report with all tables and static charts, including the fitted β(t) trajectory and the model performance metrics.</li>
                     <li><code>data_cache.csv</code> — a cleaned snapshot of the data, committed for reproducibility.</li>
                 </ul>
-                <p>The GitHub Actions workflow then assembles all files into <code>_site/</code> and publishes the result to GitHub Pages. The whole process is automatic and runs daily.</p>
+                <p>The GitHub Actions workflow assembles all files into <code>_site/</code> and publishes the result to GitHub Pages.</p>
 
                 <h3 class="resource-subhead">Step 8 — Reproducibility Guarantees</h3>
                 <ul class="resource-list">
                     <li>The upstream data snapshot is fetched fresh every run.</li>
-                    <li>R packages are installed from a locked, cached library to avoid version drift.</li>
-                    <li>The JSON output is deterministic given the same input CSV.</li>
-                    <li>Every artefact is versioned in the repository history, so any analysis can be audited later.</li>
+                    <li>R packages are installed from a locked, cached library.</li>
+                    <li>The JSON output is deterministic given the same input.</li>
+                    <li>Every artefact is versioned in the repository history.</li>
                 </ul>
 
                 <h3 class="resource-subhead">How to Reproduce Locally</h3>
-                <p>The entire pipeline can be reproduced on any machine with R installed:</p>
                 <pre class="resource-formula">
 # 1. Fetch the latest upstream data
 git clone https://github.com/webbegole/ebola-bundibugyo-tracker-2026
@@ -131,14 +137,14 @@ Rscript -e 'rmarkdown::render("dashboard.Rmd",
 # 4. Serve the portal locally
 python3 -m http.server 8000
                 </pre>
-                <p>Then open <code>http://localhost:8000</code> in a browser to see the same site that GitHub Pages hosts.</p>
+                <p>Then open <code>http://localhost:8000</code> in a browser.</p>
 
                 <h3 class="resource-subhead">Why This Workflow Matters</h3>
-                <p>In an Ebola outbreak, the value of a model is not in its elegance but in its <strong>timeliness and reliability</strong>. By automating the entire chain — data ingestion, cleaning, fitting, validation, projection, and publication — this pipeline ensures that:</p>
+                <p>In an Ebola outbreak, the value of a model is not in its elegance but in its timeliness and reliability. By including the intervention effect, by validating against a held-out window, and by anchoring the forecast to the last observed state, this pipeline ensures that:</p>
                 <ul class="resource-list">
-                    <li>The portal always shows the most recent data.</li>
-                    <li>The model is refitted every day to the newest observations.</li>
-                    <li>The forecasts and their performance metrics are always transparent.</li>
+                    <li>The forecast reflects what is actually happening, not what would have happened if nothing had been done.</li>
+                    <li>The intervention speed and timing are derived from data, not assumed.</li>
+                    <li>The performance metrics are visible and honest.</li>
                     <li>Every number displayed can be traced back to a specific code path and a specific data snapshot.</li>
                 </ul>
 
