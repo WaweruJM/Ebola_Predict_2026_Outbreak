@@ -7,9 +7,8 @@
     <link rel="stylesheet" href="../css/style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Chart.js for the SIRD line graph -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- MathJax for LaTeX equations -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
@@ -46,51 +45,55 @@
 
     <main class="portal-main">
         <section class="card-row">
-            <h2 class="row-heading">Comprehensive Guide to Compartmental Modelling</h2>
+            <h2 class="row-heading">Comprehensive Guide to Compartmental Modelling with Interventions</h2>
             <div class="resource-body">
                 
-                <p>Mathematical modelling of infectious diseases, particularly for Ebola, is essential for understanding transmission dynamics, forecasting outbreak trajectories, and evaluating the effectiveness of public health interventions. The foundational framework for this is the <strong>compartmental model</strong>, which divides a population into distinct groups (compartments) based on their infection status. Individuals flow between these compartments over time.</p>
+                <p>Mathematical modelling of infectious diseases, particularly for Ebola, is essential for understanding transmission dynamics, forecasting outbreak trajectories, and evaluating the effectiveness of public health interventions. The foundational framework for this is the <strong>compartmental model</strong>, which divides a population into distinct groups based on infection status. This guide extends the classical framework to include <strong>time-varying transmission</strong>, which is essential for realistic Ebola projections.</p>
 
                 <h3 class="resource-subhead">1. Definition of Key Biological Coefficients</h3>
-                <p>To build a model, we must define the biological parameters that govern how individuals move between compartments. These coefficients are critical and must be estimated from real-world data.</p>
+                <p>To build a model, we must define the biological and policy-related parameters that govern how individuals move between compartments.</p>
                 <ul class="resource-list">
                     <li><strong>Contact Rate (\(c\)):</strong> The average number of contacts an infectious individual makes per unit time (e.g., per day).</li>
-                    <li><strong>Probability of Transmission given a Contact (\(\tau\)):</strong> The likelihood that a contact between an infectious and susceptible individual results in transmission.</li>
-                    <li><strong>Transmission Rate (\(\beta\)):</strong> The effective contact rate, defined as \(\beta = c \cdot \tau\). It represents the rate at which susceptible individuals become infectious.</li>
-                    <li><strong>Recovery Rate (\(\gamma\)):</strong> The rate at which infectious individuals recover. It is the inverse of the mean infectious period (\(1/D\)).</li>
-                    <li><strong>Mortality Rate (\(\mu\)):</strong> The rate at which infectious individuals die from the disease and move to the Deceased compartment.</li>
-                    <li><strong>Basic Reproduction Number (\(R_0\)):</strong> The expected number of secondary cases caused by one infectious individual in a completely susceptible population. For a SIR model with mortality, \(R_0 = \beta / (\gamma + \mu)\).</li>
+                    <li><strong>Probability of Transmission (\(\tau\)):</strong> The likelihood that a contact between an infectious and susceptible individual results in transmission.</li>
+                    <li><strong>Transmission Rate (\(\beta\)):</strong> The effective contact rate, \(\beta = c \cdot \tau\). In this portal, we use a <strong>time-varying form</strong>: \(\beta(t) = \beta_0 \cdot e^{-k(t - \tau_{\text{start}})}\).</li>
+                    <li><strong>Initial Transmission (\(\beta_0\)):</strong> The transmission rate before interventions take effect.</li>
+                    <li><strong>Intervention Start (\(\tau_{\text{start}}\)):</strong> The day (from the first case) at which interventions begin to reduce transmission.</li>
+                    <li><strong>Intervention Decay (\(k\)):</strong> The rate at which transmission decreases after \(\tau_{\text{start}}\). A larger \(k\) means interventions take effect faster.</li>
+                    <li><strong>Recovery Rate (\(\gamma\)):</strong> The rate at which infectious individuals recover. It is the inverse of the mean infectious period.</li>
+                    <li><strong>Mortality Rate (\(\mu\)):</strong> The rate at which infectious individuals die from the disease.</li>
+                    <li><strong>Basic Reproduction Number (\(R_0\)):</strong> The expected number of secondary cases caused by one infectious individual before interventions: \(R_0 = \beta_0 / (\gamma + \mu)\).</li>
                 </ul>
 
                 <h3 class="resource-subhead">2. Compartmental Models and their Equations</h3>
                 <p>Depending on the disease and the questions being asked, different compartmental structures are used. Below are the most common, applied to Ebola.</p>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.1 SIS Model (Susceptible – Infectious – Susceptible)</h4>
-                <p>Used when individuals do not develop immunity and return to the susceptible pool after recovery. Not typically applicable to Ebola.</p>
+                <p>Used when individuals do not develop immunity. Not typically applicable to Ebola.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} + \gamma I \)</li>
                     <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
                 </ul>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.2 SIR Model (Susceptible – Infectious – Recovered)</h4>
-                <p>The most classic model. Individuals recover and gain permanent immunity. This is the foundation for understanding Ebola transmission, though it misses the high mortality aspect.</p>
+                <p>The most classic model. Individuals recover and gain permanent immunity. Foundation for understanding Ebola, but misses the mortality aspect.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
                     <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I \)</li>
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
 
-                <h4 style="color: var(--accent); margin: 15px 0 5px;">2.3 SIRD Model (Susceptible – Infectious – Recovered – Deceased)</h4>
-                <p>Used when mortality is a key feature. Ebola has a high case fatality rate, so a <strong>SIRD</strong> model is required to track deaths separately from recoveries.</p>
+                <h4 style="color: var(--accent); margin: 15px 0 5px;">2.3 SIRD Model (Susceptible – Infectious – Recovered – Deceased) — Used in This Portal</h4>
+                <p>Used when mortality is a key feature. Ebola has a high case fatality rate, so a <strong>SIRD</strong> model is required to track deaths separately. In this portal, the transmission rate is <strong>time-varying</strong> to reflect interventions:</p>
                 <ul class="resource-list">
-                    <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
-                    <li>\( \frac{dI}{dt} = \frac{\beta S I}{N} - (\gamma + \mu) I \)</li>
+                    <li>\( \frac{dS}{dt} = - \frac{\beta(t) S I}{N} \)</li>
+                    <li>\( \frac{dI}{dt} = \frac{\beta(t) S I}{N} - (\gamma + \mu) I \)</li>
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                     <li>\( \frac{dD}{dt} = \mu I \)</li>
+                    <li>\( \beta(t) = \beta_0 \cdot e^{-k \cdot \max(0, t - \tau_{\text{start}})} \)</li>
                 </ul>
 
                 <h4 style="color: var(--accent); margin: 15px 0 5px;">2.4 SEIR Model (Susceptible – Exposed – Infectious – Recovered)</h4>
-                <p>Used for diseases with a significant incubation period (latent phase). Ebola has an incubation period of 2–21 days, so an 'Exposed' (\(E\)) compartment is vital for realistic modelling.</p>
+                <p>Used for diseases with a significant incubation period. Ebola has an incubation period of 2–21 days.</p>
                 <ul class="resource-list">
                     <li>\( \frac{dS}{dt} = - \frac{\beta S I}{N} \)</li>
                     <li>\( \frac{dE}{dt} = \frac{\beta S I}{N} - \sigma E \)</li>
@@ -98,40 +101,41 @@
                     <li>\( \frac{dR}{dt} = \gamma I \)</li>
                 </ul>
 
-                <h4 style="color: var(--accent); margin: 25px 0 10px;">2.5 Computing Biological Coefficients from Time-Series Data</h4>
-                <p>In real-world scenarios, the compartment values \(S(t), I(t), R(t), D(t)\) are measured daily (e.g., from reported case counts). The primary unknown values are the biological coefficients (\(\beta, \gamma, \mu, R_0\)). They are derived by integrating the SIRD equations against observed data. Below are the algebraic and computational formulas for each.</p>
+                <h4 style="color: var(--accent); margin: 25px 0 10px;">2.5 Computing Biological and Intervention Coefficients from Time-Series Data</h4>
+                <p>In real-world scenarios, the compartment values \(S(t), I(t), R(t), D(t)\) are measured daily. The unknown values are the biological and intervention coefficients. They are derived by integrating the SIRD equations against observed data.</p>
                 
                 <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 15px;">
-                    <p><strong>1. Mortality Rate (\(\mu\))</strong><br>
-                    \(\mu\) is the rate at which infectious individuals die. It is calculated as the number of deaths divided by the number of active infectious individuals over a time step.</p>
+                    <p><strong>1. Mortality Rate (\(\mu\))</strong></p>
                     <p>\( \mu = \frac{\Delta D / \Delta t}{I} \)</p>
-                    <p><em>Alternatively, if the Case Fatality Rate (CFR) and the mean infectious period (\(1/\gamma\)) are known: \(\mu = \frac{\text{CFR}}{1/\gamma}\).</em></p>
+                    <p><em>Alternatively, if the Case Fatality Rate (CFR) is known: \(\mu = \frac{\text{CFR}}{1/\gamma}\).</em></p>
                 </div>
 
                 <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 15px;">
-                    <p><strong>2. Recovery Rate (\(\gamma\))</strong><br>
-                    \(\gamma\) is the rate at which infectious individuals recover. It is derived from the change in the Recovered compartment.</p>
+                    <p><strong>2. Recovery Rate (\(\gamma\))</strong></p>
                     <p>\( \gamma = \frac{\Delta R / \Delta t}{I} \)</p>
                     <p><em>Alternatively, \(\gamma = 1 / \text{Mean Infectious Period}\).</em></p>
                 </div>
 
                 <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 15px;">
-                    <p><strong>3. Transmission Rate (\(\beta\))</strong><br>
-                    \(\beta\) is derived from the rate of new infections (\(\Delta S\)).</p>
-                    <p>\( \beta = \frac{-(\Delta S / \Delta t)}{S \cdot I / N} \)</p>
-                    <p><em>Alternatively, \(\beta\) can be estimated by fitting the early exponential growth phase of the outbreak.</em></p>
+                    <p><strong>3. Initial Transmission Rate (\(\beta_0\))</strong></p>
+                    <p>Estimated from the early exponential growth phase, before interventions kick in:</p>
+                    <p>\( \beta_0 = \frac{-(\Delta S / \Delta t)_{t=0}}{S_0 \cdot I_0 / N} \)</p>
+                </div>
+
+                <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 15px;">
+                    <p><strong>4. Intervention Start (\(\tau_{\text{start}}\)) and Decay Rate (\(k\))</strong></p>
+                    <p>These are estimated by fitting the SIRD model to the observed data and minimizing the squared error. The fitted curve determines the day when transmission began to decline and how fast it declined.</p>
                 </div>
 
                 <div style="background: #f4f6f8; padding: 15px; border-left: 4px solid var(--accent); border-radius: 4px; margin-bottom: 25px;">
-                    <p><strong>4. Basic Reproduction Number (\(R_0\))</strong><br>
-                    Once \(\beta, \gamma\), and \(\mu\) are computed, \(R_0\) is calculated directly:</p>
-                    <p>\( R_0 = \frac{\beta}{\gamma + \mu} \)</p>
+                    <p><strong>5. Basic Reproduction Number (\(R_0\))</strong></p>
+                    <p>\( R_0 = \frac{\beta_0}{\gamma + \mu} \)</p>
                 </div>
 
-                <p>In practice, daily data is noisy, so we use computational fitting (e.g., <strong>non-linear least squares</strong> via the <code>optim()</code> function in R). This method iteratively adjusts \(\beta, \gamma\), and \(\mu\) to find the values that minimize the squared difference between the model's predictions and the observed data. This is exactly how the portal's daily pipeline computes the coefficients for Ebola.</p>
+                <p>In practice, daily data is noisy, so we use computational fitting (non-linear least squares via <code>optim()</code> in R). This method iteratively adjusts all coefficients to minimize the difference between model predictions and observed data.</p>
 
                 <h3 class="resource-subhead">3. Graphical Illustration of Compartmental Flows</h3>
-                <p>The diagram below illustrates the structure of these models. Arrows denote the movement of individuals between compartments.</p>
+                <p>The diagram below illustrates the structure of the models. Arrows denote the movement of individuals between compartments.</p>
                 
                 <div style="text-align: center; margin: 20px 0; background: #fff; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #ccc; overflow: visible;">
                     <svg viewBox="0 0 800 720" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
@@ -183,7 +187,7 @@
                         <text x="475" y="375" text-anchor="middle" font-size="12">γ</text>
 
                         <!-- SIRD -->
-                        <text x="50" y="500" font-weight="bold" font-size="18" fill="#0e2a4a">SIRD Model (Ebola)</text>
+                        <text x="50" y="500" font-weight="bold" font-size="18" fill="#0e2a4a">SIRD Model (Ebola, with Interventions)</text>
                         <rect x="50" y="520" width="100" height="50" rx="5" fill="#2980b9" />
                         <text x="100" y="550" text-anchor="middle" fill="white" font-weight="bold">S</text>
                         <rect x="250" y="520" width="100" height="50" rx="5" fill="#e74c3c" />
@@ -191,38 +195,38 @@
                         <rect x="450" y="520" width="100" height="50" rx="5" fill="#27ae60" />
                         <text x="500" y="550" text-anchor="middle" fill="white" font-weight="bold">R</text>
                         
-                        <!-- D Compartment -->
                         <rect x="450" y="640" width="100" height="50" rx="5" fill="#7f8c8d" />
                         <text x="500" y="670" text-anchor="middle" fill="white" font-weight="bold">D</text>
                         
                         <line x1="150" y1="535" x2="245" y2="535" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
-                        <text x="200" y="525" text-anchor="middle" font-size="12">β</text>
+                        <text x="200" y="525" text-anchor="middle" font-size="12">β(t)</text>
                         <line x1="350" y1="535" x2="445" y2="535" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
                         <text x="400" y="525" text-anchor="middle" font-size="12">γ</text>
                         
-                        <!-- Arrow to D compartment -->
                         <line x1="350" y1="555" x2="445" y2="650" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
                         <text x="390" y="615" text-anchor="middle" font-size="12">μ</text>
+                        
+                        <text x="50" y="720" font-size="12" fill="#666">Interventions reduce β(t) over time → β(t) = β0 * exp(-k * max(0, t - tau))</text>
                     </svg>
                 </div>
 
                 <h3 class="resource-subhead">4. Visualizing the SIRD Outbreak Curve</h3>
-                <p>To complement the flow diagram above, the chart below simulates a typical Ebola outbreak over 120 days using the SIRD model. For this demonstration, a small population of <strong>\(S = 1,000\)</strong> is used to clearly illustrate the scale of the compartments. You can observe the Susceptible pool depleting as the Infectious curve peaks. Crucially, the Deceased (D) curve rises steadily alongside Recoveries, reflecting Ebola's high case fatality rate.</p>
+                <p>To complement the flow diagram above, the chart below simulates a typical Ebola outbreak over 120 days using the SIRD model. For this demonstration, a small population of <strong>\(S = 1,000\)</strong> is used. The Susceptible pool depletes as the Infectious curve peaks. Crucially, the Deceased (D) curve rises alongside Recoveries, reflecting Ebola's high case fatality rate. The intervention effect is visible in the fact that the Infectious curve is <em>not</em> a perfect bell shape but rather a slower decline after the peak, reflecting the gradual decay of transmission.</p>
                 
                 <div class="chart-container" style="position: relative; height: 400px; width: 100%; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccc; margin-top: 15px;">
                     <canvas id="sirdChart"></canvas>
                 </div>
 
                 <h3 class="resource-subhead">5. Modelling, Future Projections, and Utility</h3>
-                <p>Building the model (fitting \(\beta, \gamma, \mu\) to observed data) allows us to trace the epidemic curve. Once calibrated, we can use the model for <strong>future projections</strong>.</p>
+                <p>Building the model (fitting \(\beta_0, \gamma, \mu, k, \tau_{\text{start}}\)) allows us to trace the epidemic curve. Once calibrated, we use the model for <strong>future projections</strong>.</p>
                 <ul class="resource-list">
-                    <li><strong>Projections:</strong> By running the equations forward in time, we can predict the number of cases, hospitalizations, and deaths under current conditions. This gives healthcare providers time to mobilize resources.</li>
-                    <li><strong>Informing Preventive Measures:</strong> Interventions aim to reduce \(\beta\) (e.g., isolation, safe burials) or increase \(\gamma\) (e.g., rapid treatment). The model allows us to simulate "what if" scenarios to assess the impact of these measures before they are implemented.</li>
-                    <li><strong>Posterior (Retrospective) Projections:</strong> Modelling is also used to look backward. By analyzing the early phase of an outbreak, we can infer the time and magnitude of the initial <strong>animal-to-human (zoonotic) transmission event</strong> that seeded the human epidemic. This is crucial for understanding spillover dynamics for future outbreaks.</li>
+                    <li><strong>Projections:</strong> We predict cases, hospitalizations, and deaths under current conditions, giving healthcare providers time to mobilize.</li>
+                    <li><strong>Informing Preventive Measures:</strong> Interventions reduce \(\beta(t)\). We can simulate the impact of different \(k\) (speed of intervention) and \(\tau_{\text{start}}\) (timing) to evaluate response strategies.</li>
+                    <li><strong>Posterior (Retrospective) Projections:</strong> By analyzing the early phase, we can infer the time and magnitude of the initial <strong>animal-to-human (zoonotic) transmission event</strong> that seeded the human epidemic. This is crucial for understanding spillover dynamics for future outbreaks.</li>
                 </ul>
 
                 <h3 class="resource-subhead">6. Summary and Relevance to Ebola</h3>
-                <p>For the Ebola outbreak, the SIRD or SEIR models are the most appropriate. They capture the high mortality rate (D) and the significant incubation period (E). The daily computational pipeline of this portal uses these structures to fit the observed data and generate real-time, 14-day forecasts. This provides health-policy leaders with the evidence base needed to plan and evaluate response strategies.</p>
+                <p>For the Ebola outbreak, the SIRD model with time-varying transmission is the most appropriate. It captures the high mortality rate (D), the intervention effect (\(k, \tau_{\text{start}}\)), and the animal-to-human transmission phase. The daily computational pipeline of this portal uses this structure to fit the observed data and generate real-time, 14-day forecasts. This provides health-policy leaders with the evidence base needed to plan and evaluate response strategies.</p>
 
                 <p class="resource-back" style="margin-top: 40px;"><a href="../index.html">← Back to Portal</a></p>
             </div>
@@ -237,7 +241,6 @@
         </div>
     </footer>
 
-    <!-- Script to render the SIRD Graph -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const ctx = document.getElementById('sirdChart').getContext('2d');
@@ -247,22 +250,19 @@
             const infectious = [];
             const recovered = [];
             const deceased = [];
-
-            // TYPICAL SIRD DEMONSTRATION VALUES
-            // S0 = 1000, I0 = 5 (small initial seed)
-            let S = 1000;
-            let I = 5;
+            
+            let S = 1000; 
+            let I = 5;     
             let R = 0;
             let D = 0;
+            
+            // Time-varying beta parameters
+            const beta0 = 0.4;    // Initial transmission
+            const gamma = 0.1;    // Recovery
+            const mu    = 0.15;   // Mortality
+            const k     = 0.02;   // Intervention decay rate
+            const tau   = 20;     // Intervention starts on day 20
 
-            // Typical Ebola parameters (re-tuned for a clean visual bell shape)
-            // beta = 0.35 (transmission), gamma = 0.10 (recovery, ~10 day infectious period)
-            // mu = 0.15 (mortality, ~60% CFR relative to recovery)
-            const beta = 0.35;
-            const gamma = 0.10;
-            const mu = 0.15;
-
-            // Simulate 120 days
             for (let t = 0; t <= 120; t++) {
                 days.push(`Day ${t}`);
                 susceptible.push(S);
@@ -270,18 +270,19 @@
                 recovered.push(R);
                 deceased.push(D);
 
+                // Time-varying transmission
+                const beta_t = beta0 * Math.exp(-k * Math.max(0, t - tau));
+                
                 const N = S + I + R + D;
-                const newInfections = (beta * S * I) / N;
+                const newInfections = (beta_t * S * I) / N;
                 const newRecoveries = gamma * I;
                 const newDeaths = mu * I;
 
-                // Euler integration with a small step for stability
                 S -= newInfections;
                 I += newInfections - newRecoveries - newDeaths;
                 R += newRecoveries;
                 D += newDeaths;
 
-                // Clamp negatives due to numerical artifacts
                 if (S < 0) S = 0;
                 if (I < 0) I = 0;
             }
@@ -291,44 +292,10 @@
                 data: {
                     labels: days,
                     datasets: [
-                        {
-                            label: 'Susceptible (S)',
-                            data: susceptible,
-                            borderColor: '#2980b9',
-                            backgroundColor: 'rgba(41, 128, 185, 0.10)',
-                            borderWidth: 2.5,
-                            tension: 0.35,
-                            pointRadius: 0,
-                            fill: true
-                        },
-                        {
-                            label: 'Infectious (I)',
-                            data: infectious,
-                            borderColor: '#e74c3c',
-                            backgroundColor: 'rgba(231, 76, 60, 0.10)',
-                            borderWidth: 2.5,
-                            tension: 0.35,
-                            pointRadius: 0,
-                            fill: true
-                        },
-                        {
-                            label: 'Recovered (R)',
-                            data: recovered,
-                            borderColor: '#27ae60',
-                            backgroundColor: 'rgba(39, 174, 96, 0.10)',
-                            borderWidth: 2.5,
-                            tension: 0.35,
-                            pointRadius: 0
-                        },
-                        {
-                            label: 'Deceased (D)',
-                            data: deceased,
-                            borderColor: '#7f8c8d',
-                            backgroundColor: 'rgba(127, 140, 141, 0.10)',
-                            borderWidth: 2.5,
-                            tension: 0.35,
-                            pointRadius: 0
-                        }
+                        { label: 'Susceptible (S)', data: susceptible, borderColor: '#2980b9', backgroundColor: 'rgba(41, 128, 185, 0.10)', borderWidth: 2.5, tension: 0.35, pointRadius: 0, fill: true },
+                        { label: 'Infectious (I)', data: infectious, borderColor: '#e74c3c', backgroundColor: 'rgba(231, 76, 60, 0.10)', borderWidth: 2.5, tension: 0.35, pointRadius: 0, fill: true },
+                        { label: 'Recovered (R)', data: recovered, borderColor: '#27ae60', backgroundColor: 'rgba(39, 174, 96, 0.10)', borderWidth: 2.5, tension: 0.35, pointRadius: 0 },
+                        { label: 'Deceased (D)', data: deceased, borderColor: '#7f8c8d', backgroundColor: 'rgba(127, 140, 141, 0.10)', borderWidth: 2.5, tension: 0.35, pointRadius: 0 }
                     ]
                 },
                 options: {
@@ -337,84 +304,22 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Typical SIRD Outbreak Curve (Ebola, S₀ = 1000)',
+                            text: 'Typical SIRD Outbreak Curve with Interventions (Ebola)',
                             font: { size: 16, family: 'Inter' },
                             color: '#0e2a4a'
                         },
                         subtitle: {
                             display: true,
-                            text: 'β = 0.35 (transmission) | γ = 0.10 (recovery) | μ = 0.15 (mortality)',
+                            text: 'β0 = 0.40 | γ = 0.10 | μ = 0.15 | k = 0.02 (intervention decay) | τ = 20 days',
                             font: { size: 12, family: 'Inter' },
                             color: '#6b7c93',
                             padding: { bottom: 10 }
                         },
-                        legend: {
-                            position: 'top',
-                            labels: { font: { family: 'Inter' } }
-                        },
-                        annotation: {
-                            annotations: {
-                                betaLine: {
-                                    type: 'line',
-                                    yMin: beta * 100,
-                                    yMax: beta * 100,
-                                    borderColor: '#c0392b',
-                                    borderWidth: 1.5,
-                                    borderDash: [4, 4],
-                                    label: {
-                                        display: true,
-                                        content: 'β = 0.35',
-                                        position: 'end',
-                                        backgroundColor: '#c0392b',
-                                        color: '#fff',
-                                        font: { size: 10 }
-                                    }
-                                },
-                                gammaLine: {
-                                    type: 'line',
-                                    yMin: gamma * 100,
-                                    yMax: gamma * 100,
-                                    borderColor: '#27ae60',
-                                    borderWidth: 1.5,
-                                    borderDash: [4, 4],
-                                    label: {
-                                        display: true,
-                                        content: 'γ = 0.10',
-                                        position: 'end',
-                                        backgroundColor: '#27ae60',
-                                        color: '#fff',
-                                        font: { size: 10 }
-                                    }
-                                },
-                                muLine: {
-                                    type: 'line',
-                                    yMin: mu * 100,
-                                    yMax: mu * 100,
-                                    borderColor: '#8e44ad',
-                                    borderWidth: 1.5,
-                                    borderDash: [4, 4],
-                                    label: {
-                                        display: true,
-                                        content: 'μ = 0.15',
-                                        position: 'end',
-                                        backgroundColor: '#8e44ad',
-                                        color: '#fff',
-                                        font: { size: 10 }
-                                    }
-                                }
-                            }
-                        }
+                        legend: { position: 'top', labels: { font: { family: 'Inter' } } }
                     },
                     scales: {
-                        x: {
-                            title: { display: true, text: 'Time (Days)', font: { weight: 'bold', family: 'Inter' } },
-                            ticks: { maxTicksLimit: 12, font: { family: 'Inter' } }
-                        },
-                        y: {
-                            title: { display: true, text: 'Number of Individuals', font: { weight: 'bold', family: 'Inter' } },
-                            beginAtZero: true,
-                            font: { family: 'Inter' }
-                        }
+                        x: { title: { display: true, text: 'Time (Days)', font: { weight: 'bold', family: 'Inter' } }, ticks: { maxTicksLimit: 12, font: { family: 'Inter' } } },
+                        y: { title: { display: true, text: 'Number of Individuals', font: { weight: 'bold', family: 'Inter' } }, beginAtZero: true, font: { family: 'Inter' } }
                     }
                 }
             });
