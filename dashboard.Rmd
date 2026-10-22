@@ -1,5 +1,5 @@
 ---
-title: "Ebola Disease Outbreak — SIR Modelling Report"
+title: "Ebola Disease Outbreak — SIRD Modelling Report"
 subtitle: "Integrating Statistical Modelling into Understanding and Predicting Ebola Outbreak 2026"
 author: "RDHUB Analytics"
 date: "`r Sys.Date()`"
@@ -19,16 +19,16 @@ knitr::opts_chunk$set(
   fig.align = "center"
 )
 
-# Source the pipeline to build the environment
 source("incremental_fetch.R")
 
 suppressPackageStartupMessages({
   library(ggplot2)
   library(dplyr)
   library(tidyr)
+  library(deSolve)
 })
 
-# Fail loudly if data shape is unexpected
+# Validation: fail loudly if pipeline output has changed shape
 stopifnot(
   is.data.frame(outbreak_df),
   all(c("date", "confirmed", "confirmed_deaths", "recovered") %in% names(outbreak_df)),
@@ -36,5 +36,223 @@ stopifnot(
   all(c("time", "I", "R", "D") %in% names(sir_full)),
   is.data.frame(sir_proj),
   length(predicted_I) == nrow(outbreak_df),
-  is.numeric(beta_est), is.numeric(gamma_est), is.numeric(mu_est)
+  is.numeric(beta0_est), is.numeric(gamma_est), is.numeric(mu_est),
+  is.numeric(k_est), is.numeric(tau_est), is.numeric(R0_est)
 )
+```
+
+# Overview
+
+Automated daily pipeline for the **Ebola Disease Outbreak Analysis Portal**.
+This report shares its dataset, parameter estimates, and performance metrics
+with the interactive portal at the repository root.
+
+- Population at risk: 20,000,000 persons
+- Data stream: confirmed cases only
+- Projection horizon: 14 days
+- Train / test split: 80 % / 20 %
+- Model: SIRD with time-varying transmission \(\beta(t) = \beta_0 e^{-k(t-\tau)}\)
+
+# 1. Primary Parameters
+
+```{r}
+param_tbl <- data.frame(
+  Parameter = c(
+    "Population at risk (N)",
+    "Initial infectious (I0)",
+    "Initial transmission (beta0)",
+    "Recovery rate (gamma)",
+    "Mortality rate (mu)",
+    "Intervention decay (k)",
+    "Intervention start (tau)",
+    "Basic reproduction (R0)"
+  ),
+  Value = c(
+    format(POPULATION_AT_RISK, big.mark = ","),
+    format(round(I0_fit), big.mark = ","),
+    sprintf("%.4f /day", beta0_est),
+    sprintf("%.4f /day", gamma_est),
+    sprintf("%.4f /day", mu_est),
+    sprintf("%.4f /day", k_est),
+    sprintf("%.1f days", tau_est),
+    sprintf("%.3f", R0_est)
+  )
+)
+knitr::kable(param_tbl, caption = "Primary SIRD parameters from NLS fitting")
+```
+
+# 2. Confirmed Epidemic Curve
+
+```{r confirmed-curve, fig.height=5}
+obs_long <- outbreak_df %>%
+  select(date, confirmed, confirmed_deaths, recovered) %>%
+  pivot_longer(-date, names_to = "series", values_to = "value") %>%
+  mutate(series = recode(series,
+    confirmed        = "Confirmed cases",
+    confirmed_deaths = "Confirmed deaths",
+    recovered        = "Recovered"
+  ))
+
+p1 <- ggplot(obs_long, aes(x = date, y = value, colour = series)) +
+  geom_line(linewidth = 1.15) +
+  scale_colour_manual(values = c(
+    "Confirmed cases"  = "#e74c3c",
+    "Confirmed deaths" = "#7f8c8d",
+    "Recovered"        = "#16a085"
+  ), name = "Series") +
+  labs(x = "Time (Date)", y = "Cumulative count",
+       title = "Confirmed cases, deaths and recoveries over time") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+
+print(p1)
+```
+
+# 3. SIRD Compartments
+
+```{r sir-populations, fig.height=5}
+sir_long <- sir_full %>%
+  select(time, I, R, D) %>%
+  pivot_longer(-time, names_to = "compartment", values_to = "value") %>%
+  mutate(compartment = recode(compartment,
+    I = "Infectious (I)",
+    R = "Recovered (R)",
+    D = "Deaths (D)"
+  ))
+
+p2 <- ggplot(sir_long, aes(x = time, y = value, colour = compartment)) +
+  geom_line(linewidth = 1.15) +
+  scale_colour_manual(values = c(
+    "Infectious (I)" = "#e74c3c",
+    "Recovered (R)"  = "#16a085",
+    "Deaths (D)"     = "#7f8c8d"
+  ), name = "Compartment") +
+  labs(x = "Days since first report", y = "Individuals",
+       title = "SIRD COMPARTMENTS",
+       subtitle = "N = S = 20,000,000") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right",
+        plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+print(p2)
+```
+
+# 4. Time-Varying Transmission \(\beta(t)\)
+
+```{r beta-trajectory, fig.height=5}
+beta_df <- data.frame(
+  time = sir_full$time,
+  beta_t = sir_full$beta_t
+)
+
+p3 <- ggplot(beta_df, aes(x = time, y = beta_t)) +
+  geom_line(linewidth = 1.4, colour = "#c0392b") +
+  geom_hline(yintercept = gamma_est + mu_est, linetype = "dashed",
+             colour = "#7f8c8d", linewidth = 1) +
+  annotate("text", x = max(beta_df$time) * 0.1,
+           y = gamma_est + mu_est,
+           label = "Threshold (gamma + mu)",
+           colour = "#7f8c8d", size = 3, vjust = -0.5) +
+  labs(x = "Days since first report", y = "beta(t) (/day)",
+       title = "Time-varying transmission rate",
+       subtitle = sprintf("beta(t) = beta0 * exp(-k * (t - tau)), beta0=%.3f, k=%.4f, tau=%.1f",
+                          beta0_est, k_est, tau_est)) +
+  theme_minimal(base_size = 12)
+
+print(p3)
+```
+
+# 5. Model Fit vs Observed Cases
+
+```{r fit-vs-observed, fig.height=5}
+fit_df <- data.frame(
+  date      = outbreak_df$date,
+  Observed  = observed_I,
+  Predicted = round(predicted_I, 0)
+) %>%
+  pivot_longer(-date, names_to = "series", values_to = "value")
+
+p4 <- ggplot(fit_df, aes(x = date, y = value, colour = series)) +
+  geom_line(linewidth = 1.2, linetype = "dashed") +
+  geom_line(data = subset(fit_df, series == "Observed"),
+            linewidth = 1.5, linetype = "solid") +
+  scale_colour_manual(values = c(
+    "Observed"  = "#1f2d3d",
+    "Predicted" = "#e74c3c"
+  ), name = "Series") +
+  labs(x = "Time (Date)", y = "Cumulative confirmed cases",
+       title = "Observed vs fitted cumulative cases",
+       subtitle = "SIRD with time-varying transmission") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+
+print(p4)
+```
+
+# 6. Predictive Model with Train / Test Windows
+
+```{r predictive, fig.height=6}
+full_days <- nrow(outbreak_df) - 1
+
+pred_df <- data.frame(
+  day       = seq(0, full_days + PROJECTION_DAYS),
+  observed  = c(observed_I, rep(NA, PROJECTION_DAYS)),
+  fitted    = c(predicted_I, sir_proj$I[-1] + sir_proj$R[-1] + sir_proj$D[-1])
+)
+
+zone_df <- data.frame(
+  xmin = c(-Inf,                    train_n - 1,          full_days),
+  xmax = c(train_n - 1,             full_days,            full_days + PROJECTION_DAYS),
+  fill = c("#27ae60",               "#e67e22",            "#ffffff"),
+  zone = factor(c("Training window", "Test window",       "Future prediction"),
+                levels = c("Training window", "Test window", "Future prediction"))
+)
+
+p5 <- ggplot() +
+  geom_rect(data = zone_df,
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = zone),
+            alpha = 0.16, inherit.aes = FALSE) +
+  geom_line(data = pred_df,
+            aes(x = day, y = observed),
+            colour = "#1f2d3d", linewidth = 1.5, na.rm = TRUE) +
+  geom_line(data = pred_df,
+            aes(x = day, y = fitted),
+            colour = "#e74c3c", linewidth = 1.3,
+            linetype = "dashed", na.rm = TRUE) +
+  scale_fill_manual(values = c(
+    "Training window"   = "#27ae60",
+    "Test window"       = "#e67e22",
+    "Future prediction" = "#dddddd"
+  ), name = "Window") +
+  labs(x = "Days since first report", y = "Cumulative confirmed cases",
+       title = "Observed vs fitted vs 14-day projection",
+       subtitle = "SIRD with intervention-aware transmission") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+
+print(p5)
+```
+
+# 7. Model Performance
+
+```{r performance}
+perf_tbl <- data.frame(
+  Window  = c("Train", "Test", "Overall"),
+  RMSE    = round(c(train_perf$rmse, test_perf$rmse, overall$rmse), 2),
+  MAE     = round(c(train_perf$mae,  test_perf$mae,  overall$mae),  2),
+  R2      = round(c(train_perf$r2,   test_perf$r2,   overall$r2),   3)
+)
+knitr::kable(perf_tbl, caption = "SIRD model performance metrics")
+```
+
+# 8. 14-Day Projection Table
+
+```{r projection-table}
+proj_tbl <- as.data.frame(sir_proj) %>%
+  mutate(date = max(outbreak_df$date) + time - full_days) %>%
+  select(date, time, S, I, R, D, beta_t)
+
+knitr::kable(head(proj_tbl, 15),
+             caption = "SIRD compartments over the next two weeks")
+```
