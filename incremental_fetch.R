@@ -1,6 +1,10 @@
 # ============================================================
 # incremental_fetch.R — Stepwise SIR modelling (Confirmed Only)
+# REVISED: time-varying beta(t) to account for interventions
 # ============================================================
+
+# FORCE UTC TIMEZONE
+Sys.setenv(TZ = "UTC")
 
 suppressPackageStartupMessages({
   library(dplyr); library(tidyr); library(lubridate)
@@ -43,57 +47,96 @@ last_date <- max(outbreak_df$date)
 message("  Latest date in data: ", last_date)
 readr::write_csv(outbreak_df, "data_cache.csv")
 
-# ---------- STEP 3: SIR MODEL DEFINITION ----------
-sir_model <- function(time, state, parms) {
+# ---------- STEP 3: SIR MODEL WITH TIME-VARYING BETA ----------
+# Literature: Ebola transmission decays as interventions take effect.
+# We model beta(t) = beta0 * exp(-k * max(0, t - tau))
+# where tau is the intervention start time and k is the decay rate.
+# This is the standard approach from Althaus (2014) and Nishiura (2019).
+
+sir_model_intervention <- function(time, state, parms) {
   with(as.list(c(state, parms)), {
     N  <- S + I + R + D
-    dS <- -beta * S * I / N
-    dI <-  beta * S * I / N - (gamma + mu) * I
+    
+    # Time-varying transmission: decays after intervention threshold
+    beta_t <- beta0 * exp(-k * pmax(0, time - tau))
+    
+    dS <- -beta_t * S * I / N
+    dI <-  beta_t * S * I / N - (gamma + mu) * I
     dR <-  gamma * I
     dD <-  mu * I
-    list(c(dS, dI, dR, dD))
+    list(c(dS, dI, dR, dD), beta_t = beta_t)
   })
 }
 
-# ---------- STEP 4: TRAINING (Fit to Cumulative Cases) ----------
-message("STEP 4 — Training SIR Model via optim()")
+# ---------- STEP 4: TRAINING (Fit beta0, k, tau) ----------
+message("STEP 4 — Training intervention-aware SIR model")
+
 train_n   <- floor(n_obs * TRAIN_FRACTION)
-train_idx <- 1:train_n
-train_obs <- outbreak_df$confirmed[train_idx]
+train_obs <- outbreak_df$confirmed[1:train_n]
 train_t   <- 0:(train_n - 1)
 
+# Objective: minimize SSE between observed cumulative cases and model I+R+D
 sir_objective <- function(par) {
-  beta  <- exp(par[1]); gamma <- exp(par[2]); i0 <- exp(par[3]); mu <- 0.05
+  # Parameters on log scale (all must be positive)
+  beta0 <- exp(par[1])
+  gamma <- exp(par[2])
+  mu    <- exp(par[3])
+  k     <- exp(par[4])
+  tau   <- exp(par[5])
+  i0    <- exp(par[6])
+  
+  # Guard against unreasonable parameters
+  if (beta0 > 5 || gamma > 2 || mu > 2 || k > 1 || tau > 100) return(1e12)
+  
   state0 <- c(S = POPULATION_AT_RISK - i0, I = i0, R = 0, D = 0)
+  
   out <- tryCatch(
-    as.data.frame(ode(state0, train_t, sir_model, c(beta=beta, gamma=gamma, mu=mu))),
+    as.data.frame(ode(state0, train_t, sir_model_intervention,
+                      c(beta0 = beta0, gamma = gamma, mu = mu, k = k, tau = tau))),
     error = function(e) NULL
   )
   if (is.null(out)) return(1e12)
+  
   predicted_cum <- out$I + out$R + out$D
   sum((predicted_cum - train_obs)^2)
 }
 
+# Initial guesses: beta0=0.5, gamma=0.1, mu=0.05, k=0.01, tau=30, i0=10
+init_par <- log(c(0.5, 0.1, 0.05, 0.01, 30, 10))
+
 fit <- optim(
-  par = log(c(0.5, 0.1, 10)),
-  fn = sir_objective,
-  method = "L-BFGS-B",
-  lower = log(c(0.01, 0.01, 1)),
-  upper = log(c(5.0, 1.0, 1000)),
-  control = list(maxit = 1000)
+  par     = init_par,
+  fn      = sir_objective,
+  method  = "L-BFGS-B",
+  lower   = log(c(0.01, 0.01, 0.001, 0.0001, 1, 1)),
+  upper   = log(c(5.0, 1.0, 1.0, 0.5, 200, 1000)),
+  control = list(maxit = 2000)
 )
 
-beta_est  <- exp(fit$par[1])
+# Extract fitted parameters
+beta0_est <- exp(fit$par[1])
 gamma_est <- exp(fit$par[2])
-I0_fit    <- exp(fit$par[3])
-mu_est    <- 0.05
-R0_est    <- beta_est / (gamma_est + mu_est)
+mu_est    <- exp(fit$par[3])
+k_est     <- exp(fit$par[4])
+tau_est   <- exp(fit$par[5])
+I0_fit    <- exp(fit$par[6])
 
-# ---------- STEP 5: TESTING & FULL FIT ----------
-message("STEP 5 — Evaluating on Full Window")
+# Effective R0 at start (before interventions)
+R0_est <- beta0_est / (gamma_est + mu_est)
+
+message(sprintf("  beta0=%.4f  gamma=%.4f  mu=%.4f", beta0_est, gamma_est, mu_est))
+message(sprintf("  k=%.4f  tau=%.1f  R0=%.3f", k_est, tau_est, R0_est))
+
+# ---------- STEP 5: FULL FIT & PERFORMANCE ----------
+message("STEP 5 — Evaluating on full window")
+
 full_t <- 0:(n_obs - 1)
 state0_full <- c(S = POPULATION_AT_RISK - I0_fit, I = I0_fit, R = 0, D = 0)
-sir_full <- as.data.frame(ode(state0_full, full_t, sir_model, c(beta=beta_est, gamma=gamma_est, mu=mu_est)))
+
+sir_full <- as.data.frame(
+  ode(state0_full, full_t, sir_model_intervention,
+      c(beta0 = beta0_est, gamma = gamma_est, mu = mu_est, k = k_est, tau = tau_est))
+)
 
 predicted_I <- sir_full$I + sir_full$R + sir_full$D
 observed_I  <- outbreak_df$confirmed
@@ -110,8 +153,12 @@ train_perf <- perf_metrics(observed_I[1:train_n], predicted_I[1:train_n])
 test_perf  <- perf_metrics(observed_I[(train_n+1):n_obs], predicted_I[(train_n+1):n_obs])
 overall    <- perf_metrics(observed_I, predicted_I)
 
-# ---------- STEP 6: PROJECTION ----------
+message(sprintf("  TRAIN RMSE=%.2f  R2=%.3f", train_perf$rmse, train_perf$r2))
+message(sprintf("  TEST  RMSE=%.2f  R2=%.3f", test_perf$rmse, test_perf$r2))
+
+# ---------- STEP 6: PROJECTION (Anchored, with continued intervention decay) ----------
 message("STEP 6 — 14-Day Projection")
+
 proj_t <- n_obs - 1 + 0:PROJECTION_DAYS
 anchor_state <- c(
   S = POPULATION_AT_RISK - tail(outbreak_df$confirmed, 1),
@@ -119,26 +166,20 @@ anchor_state <- c(
   R = tail(outbreak_df$recovered, 1),
   D = tail(outbreak_df$confirmed_deaths, 1)
 )
-sir_proj <- as.data.frame(ode(anchor_state, proj_t, sir_model, c(beta=beta_est, gamma=gamma_est, mu=mu_est)))
+
+sir_proj <- as.data.frame(
+  ode(anchor_state, proj_t, sir_model_intervention,
+      c(beta0 = beta0_est, gamma = gamma_est, mu = mu_est, k = k_est, tau = tau_est))
+)
 proj_cum <- sir_proj$I + sir_proj$R + sir_proj$D
 
 # ---------- STEP 7: TELEMETRY & EXPORT JSON ----------
-# Anchor comparison STRICTLY to the real calendar date (UTC).
 today_date     <- Sys.Date()
 yesterday_date <- today_date - 1
 
-# Debug output to see what is happening inside the runner
-message("DEBUG: Sys.Date() is ", today_date)
-message("DEBUG: last_date in dataset is ", last_date)
-
-# Find the exact row for today and yesterday in the dataset.
 today_row     <- outbreak_df %>% filter(date == today_date)
 yesterday_row <- outbreak_df %>% filter(date == yesterday_date)
 
-message("DEBUG: Rows found for today: ", nrow(today_row))
-message("DEBUG: Rows found for yesterday: ", nrow(yesterday_row))
-
-# Determine if BOTH today and yesterday actually exist in the data.
 has_24h_delta <- (nrow(today_row) > 0) && (nrow(yesterday_row) > 0)
 
 fmt_delta <- function(cur, prev, unit = "", has_data) {
@@ -153,7 +194,6 @@ trend_val <- function(cur, prev, has_data) {
   if (cur > prev) "up" else if (cur < prev) "down" else ""
 }
 
-# If today exists, use its values. Otherwise, fall back to the absolute last data point.
 card_values <- if (nrow(today_row) > 0) today_row else tail(outbreak_df, 1)
 
 safe_confirmed <- card_values$confirmed
@@ -169,29 +209,31 @@ prev_active    <- if(has_24h_delta) yesterday_row$active_cases else NA
 prev_cfr       <- if(has_24h_delta) yesterday_row$cfr else NA
 
 case_telemetry <- list(
-  list(label = "Confirmed Cases",    value = safe_confirmed, unit = "", 
-       delta = fmt_delta(safe_confirmed, prev_confirmed, "", has_24h_delta), 
+  list(label = "Confirmed Cases",    value = safe_confirmed, unit = "",
+       delta = fmt_delta(safe_confirmed, prev_confirmed, "", has_24h_delta),
        trend = trend_val(safe_confirmed, prev_confirmed, has_24h_delta)),
-  list(label = "Confirmed Deaths",   value = safe_deaths, unit = "", 
-       delta = fmt_delta(safe_deaths, prev_deaths, "", has_24h_delta), 
+  list(label = "Confirmed Deaths",   value = safe_deaths, unit = "",
+       delta = fmt_delta(safe_deaths, prev_deaths, "", has_24h_delta),
        trend = trend_val(safe_deaths, prev_deaths, has_24h_delta)),
-  list(label = "Recovered",          value = safe_recov, unit = "", 
-       delta = fmt_delta(safe_recov, prev_recov, "", has_24h_delta), 
+  list(label = "Recovered",          value = safe_recov, unit = "",
+       delta = fmt_delta(safe_recov, prev_recov, "", has_24h_delta),
        trend = trend_val(safe_recov, prev_recov, has_24h_delta)),
-  list(label = "Active Cases",       value = safe_active, unit = "", 
-       delta = fmt_delta(safe_active, prev_active, "", has_24h_delta), 
+  list(label = "Active Cases",       value = safe_active, unit = "",
+       delta = fmt_delta(safe_active, prev_active, "", has_24h_delta),
        trend = trend_val(safe_active, prev_active, has_24h_delta)),
-  list(label = "Case Fatality Rate", value = safe_cfr, unit = "%", 
-       delta = fmt_delta(safe_cfr, prev_cfr, "pts", has_24h_delta), 
+  list(label = "Case Fatality Rate", value = safe_cfr, unit = "%",
+       delta = fmt_delta(safe_cfr, prev_cfr, "pts", has_24h_delta),
        trend = trend_val(safe_cfr, prev_cfr, has_24h_delta))
 )
 
+# Updated coefficients to include intervention parameters
 bio_coefficients <- list(
-  list(label = "beta (Transmission Rate)", value = round(beta_est, 4), unit = "/day", delta = "Fitted via NLS"),
-  list(label = "gamma (Recovery Rate)",    value = round(gamma_est, 4), unit = "/day", delta = "Fitted via NLS"),
-  list(label = "mu (Mortality Rate)",      value = round(mu_est, 4), unit = "/day", delta = "Fixed at 0.05"),
-  list(label = "R0 (Basic Reproduction)",  value = round(R0_est, 3), unit = "", delta = "beta / (gamma + mu)"),
-  list(label = "Growth Rate (r)",          value = round(beta_est - gamma_est - mu_est, 4), unit = "/day", delta = "beta - gamma - mu")
+  list(label = "beta0 (Initial Transmission)", value = round(beta0_est, 4), unit = "/day", delta = "Pre-intervention"),
+  list(label = "gamma (Recovery Rate)",         value = round(gamma_est, 4), unit = "/day", delta = "Fitted via NLS"),
+  list(label = "mu (Mortality Rate)",           value = round(mu_est, 4), unit = "/day", delta = "Fitted via NLS"),
+  list(label = "R0 (Basic Reproduction)",       value = round(R0_est, 3), unit = "", delta = "beta0 / (gamma + mu)"),
+  list(label = "Intervention Decay (k)",        value = round(k_est, 4), unit = "/day", delta = "Rate of beta decline"),
+  list(label = "Intervention Start (tau)",      value = round(tau_est, 1), unit = "days", delta = "Days from first case")
 )
 
 step_n  <- max(1, floor(n_obs / 40))
@@ -210,9 +252,11 @@ chart_series <- list(
   sir_I                = sir_full$I[obs_idx],
   sir_R                = sir_full$R[obs_idx],
   sir_D                = sir_full$D[obs_idx],
-  coeff_beta           = rep(beta_est, length(obs_idx)),
+  coeff_beta           = rep(beta0_est, length(obs_idx)),
   coeff_gamma          = rep(gamma_est, length(obs_idx)),
-  coeff_mu             = rep(mu_est, length(obs_idx))
+  coeff_mu             = rep(mu_est, length(obs_idx)),
+  # NEW: beta(t) trajectory for visualization
+  beta_t               = sir_full$beta_t[obs_idx]
 )
 
 n_pts <- length(chart_series$months)
@@ -223,25 +267,28 @@ zones <- list(
 )
 
 sliders <- list(
-  list(id = "beta", label = "Transmission Rate (beta)", min = 0.05, max = 1.5, step = 0.01, value = round(beta_est, 2)),
-  list(id = "gamma", label = "Recovery Rate (gamma)", min = 0.02, max = 0.5, step = 0.01, value = round(gamma_est, 2)),
-  list(id = "mu", label = "Mortality Rate (mu)", min = 0.0, max = 0.5, step = 0.01, value = round(mu_est, 2)),
-  list(id = "zoonotic", label = "Zoonotic Spillover", min = 0, max = 50, step = 1, value = 12),
-  list(id = "interv", label = "Intervention Efficacy", min = 0, max = 100, step = 1, value = 35)
+  list(id = "beta0", label = "Initial Transmission (beta0)", min = 0.05, max = 2.0, step = 0.01, value = round(beta0_est, 2)),
+  list(id = "gamma", label = "Recovery Rate (gamma)",        min = 0.02, max = 0.5, step = 0.01, value = round(gamma_est, 2)),
+  list(id = "mu",    label = "Mortality Rate (mu)",          min = 0.0,  max = 0.5, step = 0.01, value = round(mu_est, 2)),
+  list(id = "k",     label = "Intervention Decay (k)",       min = 0.0001, max = 0.1, step = 0.001, value = round(k_est, 3)),
+  list(id = "tau",   label = "Intervention Start (tau)",     min = 1, max = 200, step = 1, value = round(tau_est, 0))
 )
 
 payload <- list(
-  generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  last_data_date = format(last_date, "%Y-%m-%d"),
+  generated_at       = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+  last_data_date     = format(last_date, "%Y-%m-%d"),
   population_at_risk = POPULATION_AT_RISK,
-  projection_days = PROJECTION_DAYS,
-  primary_parameters = list(beta = beta_est, gamma = gamma_est, mu = mu_est, R0 = R0_est, growth_rate = beta_est - gamma_est - mu_est),
+  projection_days    = PROJECTION_DAYS,
+  primary_parameters = list(
+    beta0 = beta0_est, gamma = gamma_est, mu = mu_est,
+    R0 = R0_est, k = k_est, tau = tau_est, I0 = I0_fit
+  ),
   performance = list(train = train_perf, test = test_perf, overall = overall),
-  case_telemetry = case_telemetry,
+  case_telemetry   = case_telemetry,
   bio_coefficients = bio_coefficients,
-  chart_series = chart_series,
-  zones = zones,
-  sliders = sliders
+  chart_series     = chart_series,
+  zones            = zones,
+  sliders          = sliders
 )
 
 if (!dir.exists("data")) dir.create("data", recursive = TRUE)
