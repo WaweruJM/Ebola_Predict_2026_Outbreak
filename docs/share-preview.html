@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Social Preview Card Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; font-family: 'Inter', sans-serif;
+               display: flex; justify-content: center; align-items: center;
+               min-height: 100vh; padding: 20px; }
+        /* The 1200x630 card */
+        .card {
+            width: 1200px; height: 630px; position: relative;
+            background: linear-gradient(135deg, #061c33 0%, #0e2a4a 50%, #061c33 100%);
+            overflow: hidden; border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        /* Radial glow behind the virus */
+        .glow {
+            position: absolute; inset: 0;
+            background: radial-gradient(circle at 80% 50%, rgba(231,76,60,0.28) 0%, transparent 60%);
+        }
+        /* Virus image on the right */
+        .virus {
+            position: absolute; right: 40px; top: 50%;
+            transform: translateY(-50%);
+            width: 420px; height: 420px; border-radius: 50%;
+            object-fit: cover;
+            border: 6px solid rgba(231,76,60,0.45);
+            box-shadow: 0 0 60px rgba(231,76,60,0.5),
+                        0 0 120px rgba(231,76,60,0.25);
+            background: #0b1929;
+        }
+        /* Left text block */
+        .text-block {
+            position: absolute; left: 70px; top: 50%;
+            transform: translateY(-50%);
+            max-width: 640px; color: #ffffff;
+        }
+        .badge {
+            display: inline-block; padding: 8px 18px;
+            background: rgba(231,76,60,0.18);
+            border: 1px solid rgba(231,76,60,0.55);
+            border-radius: 24px; font-size: 18px; font-weight: 600;
+            color: #ff6b5b; letter-spacing: 1px;
+            text-transform: uppercase; margin-bottom: 28px;
+        }
+        .badge .dot {
+            display: inline-block; width: 10px; height: 10px;
+            background: #e74c3c; border-radius: 50%;
+            margin-right: 10px; vertical-align: middle;
+            animation: pulse 1.4s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+        .title {
+            font-size: 58px; font-weight: 800; line-height: 1.05;
+            letter-spacing: -1px; margin-bottom: 22px;
+        }
+        .title span { color: #e74c3c; }
+        .subtitle {
+            font-size: 26px; font-weight: 400; line-height: 1.4;
+            color: #cfe0ef; margin-bottom: 32px;
+        }
+        .stats {
+            display: flex; gap: 40px; padding-top: 24px;
+            border-top: 2px solid rgba(255,255,255,0.15);
+        }
+        .stat-label {
+            font-size: 14px; text-transform: uppercase;
+            letter-spacing: 2px; color: #6b7c93; margin-bottom: 6px;
+        }
+        .stat-value {
+            font-size: 26px; font-weight: 800; color: #e74c3c;
+        }
+        /* Footer branding */
+        .footer {
+            position: absolute; bottom: 26px; left: 70px; right: 70px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 16px; color: #6b7c93;
+        }
+        .footer a { color: #cfe0ef; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <!-- The card — screenshot this 1200x630 box -->
+    <div class="card">
+        <div class="glow"></div>
+
+        <!-- Replace this with your actual virus image -->
+        <img src="../assets/background.jpg" alt="Ebola virus" class="virus">
+
+        <div class="text-block">
+            <div class="badge">
+                <span class="dot"></span> Live Outbreak Analytics
+            </div>
+            <div class="title">
+                Ebola Outbreak<br>
+                <span>Analysis Portal</span> 2026
+            </div>
+            <div class="subtitle">
+                Real-time SIRD modelling, 14-day forecasts, and interactive intervention scenarios.
+            </div>
+            <div class="stats">
+                <div>
+                    <div class="stat-label">Population at Risk</div>
+                    <div class="stat-value">20,000,000</div>
+                </div>
+                <div>
+                    <div class="stat-label">Projection Horizon</div>
+                    <div class="stat-value">14 Days</div>
+                </div>
+                <div>
+                    <div class="stat-label">Model</div>
+                    <div class="stat-value">SIRD</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <span>Daily Updated Data Analysis</span>
+            <span>wawerujm.github.io</span>
+        </div>
+    </div>
+
+</body>
+</html>
