@@ -43,49 +43,59 @@
 
     <main class="portal-main">
         <section class="card-row">
-            <h2 class="row-heading">Solving the Ebola SIRD System in R</h2>
+            <h2 class="row-heading">Solving the Intervention-Aware SIRD System in R</h2>
             <div class="resource-body">
                 
-                <p><strong>deSolve</strong> is the standard R package for solving initial value problems in ordinary differential equations. It provides a unified interface to dozens of numerical solvers and is the computational engine behind the epidemic projections on this portal.</p>
+                <p><strong>deSolve</strong> is the standard R package for solving initial value problems in ordinary differential equations. It provides the computational engine behind the epidemic projections on this portal, including the time-varying transmission rate that reflects interventions.</p>
 
                 <h3 class="resource-subhead">1. The Three-Step Pattern</h3>
                 <p>Every <code>deSolve</code> model follows the same recipe:</p>
                 <ol class="resource-list">
-                    <li><strong>Define the derivative function</strong> — a function that takes the current state and parameters and returns the rate of change for each compartment.</li>
+                    <li><strong>Define the derivative function</strong> — takes the state and parameters, returns the rate of change for each compartment.</li>
                     <li><strong>Set initial conditions</strong> — the state of every compartment at time zero.</li>
-                    <li><strong>Call <code>ode()</code></strong> with the initial state, the time vector, the derivative function, and the parameters.</li>
+                    <li><strong>Call <code>ode()</code></strong> with the initial state, time vector, derivative function, and parameters.</li>
                 </ol>
 
-                <h3 class="resource-subhead">2. The SIRD Derivative Function</h3>
-                <p>For Ebola, the derivative function encodes the four ODEs of the SIRD model:</p>
+                <h3 class="resource-subhead">2. The SIRD Derivative Function with Interventions</h3>
+                <p>For Ebola, the derivative function encodes the four ODEs <em>and</em> the time-varying transmission rate:</p>
                 <pre class="resource-formula">
 library(deSolve)
 
 sird_model &lt;- function(time, state, parms) {
   with(as.list(c(state, parms)), {
-    N  &lt;- S + I + R + D
-    dS &lt;- -beta * S * I / N
-    dI &lt;-  beta * S * I / N - (gamma + mu) * I
+    N &lt;- S + I + R + D
+    
+    # Time-varying transmission: beta0 before tau, decaying afterward
+    beta_t &lt;- beta0 * exp(-k * max(0, time - tau))
+    
+    dS &lt;- -beta_t * S * I / N
+    dI &lt;-  beta_t * S * I / N - (gamma + mu) * I
     dR &lt;-  gamma * I
     dD &lt;-  mu * I
-    list(c(dS, dI, dR, dD))
+    list(c(dS, dI, dR, dD), beta_t = beta_t)
   })
 }
                 </pre>
-                <p>The function returns a list whose last element is a vector of derivatives. <code>deSolve</code> uses this vector to advance the state forward in time.</p>
+                <p>Notice that the function returns both the derivatives and the current value of β(t). This allows the fitted trajectory to be plotted, so the analyst can inspect when the intervention effect became significant.</p>
 
                 <h3 class="resource-subhead">3. Setting Up the Initial State</h3>
-                <p>On day 1 of the outbreak, the number of infectious individuals is known from the data. The initial Susceptible, Recovered, and Deceased values are derived from that:</p>
                 <pre class="resource-formula">
 state0 &lt;- c(
-  S = 20000000 - 5,   # 20 million population at risk
-  I = 5,              # 5 confirmed Ebola cases on day 1
+  S = 20000000 - 5,
+  I = 5,
   R = 0,
   D = 0
 )
 
-params &lt;- c(beta = 0.42, gamma = 0.13, mu = 0.05)
-times  &lt;- 0:150
+params &lt;- c(
+  beta0 = 0.40,   # transmission before interventions
+  gamma = 0.10,   # recovery
+  mu    = 0.15,   # mortality
+  k     = 0.02,   # intervention decay
+  tau   = 20      # intervention start (days since first case)
+)
+
+times &lt;- 0:150
                 </pre>
 
                 <h3 class="resource-subhead">4. Running the Solver</h3>
@@ -98,36 +108,42 @@ out &lt;- ode(
 )
 
 head(out)
-#   time        S       I     R       D
-# 1    0 19999995       5     0       0
-# 2    1 19999995.3 ...   ...     ...
+#   time        S       I     R       D    beta_t
+# 1    0 19999995       5     0       0    0.4000
+# 2    1 19999995.3 ...   ...     ...     0.4000
+...
+# 21  20 19998790.5 ...   ...     ...     0.4000   &lt;-- tau
+# 22  21 ...                               0.3921   &lt;-- decay begins
                 </pre>
-                <p>The result is a data frame with one row per time point and one column per compartment. It is the full trajectory of the outbreak over the simulated period.</p>
+                <p>The result is a data frame with one row per time point and columns for each compartment plus β(t). It is the complete trajectory of the outbreak.</p>
 
                 <h3 class="resource-subhead">5. Choosing the Right Solver</h3>
-                <p><code>deSolve</code> includes several solvers. Choosing the right one depends on the properties of the system:</p>
                 <ul class="resource-list">
-                    <li><strong>lsoda</strong> — the default; auto-switches between stiff and non-stiff methods; recommended for epidemic models.</li>
-                    <li><strong>vode</strong> — variable-coefficient solver, good for long integrations.</li>
-                    <li><strong>ode45</strong> — classic non-stiff Runge–Kutta; fast but fragile on stiff systems.</li>
-                    <li><strong>radau</strong> — implicit solver for very stiff systems with large compartment scale differences.</li>
+                    <li><strong>lsoda</strong> — default; auto-switches between stiff and non-stiff; recommended for epidemic models with time-varying parameters.</li>
+                    <li><strong>vode</strong> — variable-coefficient, good for long integrations.</li>
+                    <li><strong>ode45</strong> — classic non-stiff; can fail on stiff systems.</li>
+                    <li><strong>radau</strong> — implicit solver for very stiff systems.</li>
                 </ul>
-                <p>For the Ebola portal, <code>lsoda</code> is used because it balances stability and speed even when the Susceptible population is 20,000,000 and Infectious is 5.</p>
+                <p>For Ebola, <code>lsoda</code> is used because the Susceptible population (20,000,000) and the Infectious population (single digits) differ by seven orders of magnitude, and the intervention effect introduces additional time-scale variation.</p>
 
                 <h3 class="resource-subhead">6. Calibrating the Model with optim()</h3>
-                <p><code>deSolve</code> solves the equations once the parameters are known. But how do we find the parameters in the first place? We pair <code>deSolve</code> with <code>optim()</code>, an R function that minimizes a user-defined objective function.</p>
-                <p>The objective compares the model's predicted cumulative cases (\(\text{I} + \text{R} + \text{D}\)) against the observed cumulative cases, and returns the sum of squared errors:</p>
+                <p>The parameters β₀, γ, μ, k, and τ must all be estimated from the data. This is done by minimizing the sum of squared errors between observed and predicted cumulative cases:</p>
                 <pre class="resource-formula">
 sird_objective &lt;- function(par) {
-  beta  &lt;- exp(par[1])
+  beta0 &lt;- exp(par[1])
   gamma &lt;- exp(par[2])
-  i0    &lt;- exp(par[3])
-  mu    &lt;- 0.05
+  mu    &lt;- exp(par[3])
+  k     &lt;- exp(par[4])
+  tau   &lt;- exp(par[5])
+  i0    &lt;- exp(par[6])
+
+  # Guard against pathological values
+  if (beta0 &gt; 5 || gamma &gt; 2 || mu &gt; 2 || k &gt; 1 || tau &gt; 100) return(1e12)
 
   state0 &lt;- c(S = 2e7 - i0, I = i0, R = 0, D = 0)
   out &lt;- tryCatch(
     ode(state0, times, sird_model,
-        c(beta = beta, gamma = gamma, mu = mu)),
+        c(beta0 = beta0, gamma = gamma, mu = mu, k = k, tau = tau)),
     error = function(e) NULL
   )
   if (is.null(out)) return(1e12)
@@ -137,35 +153,38 @@ sird_objective &lt;- function(par) {
 }
 
 fit &lt;- optim(
-  par    = log(c(0.5, 0.1, 5)),
+  par    = log(c(0.5, 0.1, 0.05, 0.01, 30, 5)),
   fn     = sird_objective,
   method = "L-BFGS-B",
-  lower  = log(c(0.01, 0.01, 1)),
-  upper  = log(c(5.0, 1.0, 1000))
+  lower  = log(c(0.01, 0.01, 0.001, 0.0001, 1, 1)),
+  upper  = log(c(5.0,  1.0,  1.0,   0.5,    200, 1000))
 )
                 </pre>
-                <p>Two crucial details here:</p>
+                <p>Four details are critical:</p>
                 <ul class="resource-list">
-                    <li><strong>Logarithmic reparameterization:</strong> <code>optim()</code> works with <code>log()</code>-scaled parameters so that all proposals are automatically positive. This is essential because all epidemiological rates are positive by definition.</li>
-                    <li><strong>tryCatch() wrapper:</strong> <code>ode()</code> can fail if the parameters are physically impossible (e.g., a negative recovery rate). The wrapper returns a large penalty value so <code>optim()</code> avoids that region of parameter space instead of crashing.</li>
+                    <li><strong>Log reparameterization:</strong> all parameters are fit on a log scale so proposals are automatically positive (all rates must be positive).</li>
+                    <li><strong>Bounds:</strong> the <code>lower</code> and <code>upper</code> arguments keep the optimizer in physically plausible parameter space.</li>
+                    <li><strong>Guard clause:</strong> if the proposed parameter set is unreasonable, the objective returns <code>1e12</code> — a value that the optimizer quickly learns to avoid.</li>
+                    <li><strong>tryCatch():</strong> if <code>ode()</code> fails (which can happen at extreme parameter values), the objective returns the same large penalty rather than crashing.</li>
                 </ul>
 
                 <h3 class="resource-subhead">7. Full-Fit and Projection Workflow</h3>
-                <p>In practice, the model is fitted in three stages:</p>
+                <p>The model is fitted in three stages:</p>
                 <ol class="resource-list">
-                    <li><strong>Training:</strong> Fit the parameters to the first 80% of the observed data.</li>
-                    <li><strong>Full fit:</strong> Re-solve over the entire observed window to plot the model against all data.</li>
-                    <li><strong>Projection:</strong> Anchor a new <code>ode()</code> call at the <em>last observed state</em> and integrate forward for the projection horizon.</li>
+                    <li><strong>Training:</strong> Fit β₀, γ, μ, k, τ to the first 80% of the observed data.</li>
+                    <li><strong>Full fit:</strong> Re-solve over the entire observed window to compare the fitted curve against all observations.</li>
+                    <li><strong>Projection:</strong> Anchor a new <code>ode()</code> call at the <em>last observed state</em> and integrate forward for 14 days, continuing the β(t) decay.</li>
                 </ol>
-                <p>Anchoring the projection at the last observed state is critical. If you simply continue integrating from the model's fitted state on the last training day, the projection can jump discontinuously at the boundary. Anchoring fixes this and guarantees that the projected curve starts exactly where the observed curve ends.</p>
+                <p>Anchoring at the last observed state is critical. If the projection simply continued from the model's fitted state, it could jump discontinuously at the boundary between data and forecast. Anchoring prevents this and guarantees visual continuity.</p>
 
                 <h3 class="resource-subhead">8. Practical Tips</h3>
                 <ul class="resource-list">
-                    <li>Always inspect the return object — <code>NA</code> rows indicate the solver failed.</li>
+                    <li>Inspect the return object — <code>NA</code> rows indicate solver failure.</li>
                     <li>Wrap calls in <code>tryCatch()</code>, especially inside <code>optim()</code>.</li>
-                    <li>Bound parameters tightly with <code>lower</code> and <code>upper</code>.</li>
+                    <li>Always bound parameters to avoid unphysical estimates.</li>
                     <li>Normalize errors by the number of observations so RMSE and MAE are interpretable.</li>
-                    <li>Split the data into training and testing windows before fitting, to validate the projection.</li>
+                    <li>Hold out the last 20% of data for validation before trusting the projection.</li>
+                    <li>Plot the fitted β(t) alongside the observed cases — if the intervention decay does not align with a visible slowdown in the data, the fitted parameters are not trustworthy.</li>
                 </ul>
 
                 <p class="resource-back"><a href="../index.html">← Back to Portal</a></p>
