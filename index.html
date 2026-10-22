@@ -3,12 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ebola Disease Outbreak Analysis Portal 2026</title>
     
-    <link rel="stylesheet" href="css/style.css?v=11">
+    <!-- ============================================
+         PRIMARY META TAGS
+         ============================================ -->
+    <title>Ebola Outbreak Analysis Portal 2026</title>
+    <meta name="title" content="Ebola Outbreak Analysis Portal 2026">
+    <meta name="description" content="Real-time SIRD modelling and 14-day forecasts for the 2026 Ebola outbreak. Interactive dashboards, biological coefficients, and intervention scenarios.">
+    <meta name="theme-color" content="#0e2a4a">
+
+    <!-- ============================================
+         OPEN GRAPH / WHATSAPP / FACEBOOK / LINKEDIN
+         ============================================ -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://wawerujm.github.io/Ebola_Predict_2026_Outbreak/">
+    <meta property="og:title" content="Ebola Outbreak Analysis Portal 2026">
+    <meta property="og:description" content="Real-time SIRD modelling and 14-day forecasts for the 2026 Ebola outbreak. Interactive dashboards, biological coefficients, and intervention scenarios.">
+    <meta property="og:image" content="https://wawerujm.github.io/Ebola_Predict_2026_Outbreak/assets/share-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ebola Outbreak Analysis Portal 2026">
+    <meta property="og:site_name" content="Ebola Outbreak Analysis Portal">
+
+    <!-- ============================================
+         TWITTER / X CARD
+         ============================================ -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ebola Outbreak Analysis Portal 2026">
+    <meta name="twitter:description" content="Real-time SIRD modelling and 14-day forecasts for the 2026 Ebola outbreak.">
+    <meta name="twitter:image" content="https://wawerujm.github.io/Ebola_Predict_2026_Outbreak/assets/share-card.jpg">
+
+    <!-- ============================================
+         STYLES AND DEPENDENCIES
+         ============================================ -->
+    <link rel="stylesheet" href="css/style.css?v=13">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
+
+    <!-- ============================================
+         BACKGROUND OVERRIDE
+         ============================================ -->
     <style>
         body {
             background-image: url('assets/background.jpg') !important;
@@ -27,6 +61,9 @@
 </head>
 <body>
 
+    <!-- ============================================
+         TOP MARQUEE
+         ============================================ -->
     <div class="top-marquee">
         <div class="marquee-track">
             <span class="marquee-text">
@@ -38,6 +75,9 @@
         </div>
     </div>
 
+    <!-- ============================================
+         HEADER
+         ============================================ -->
     <header class="portal-header">
         <div class="header-inner">
             <div class="virus-icon left-virus" aria-hidden="true">
@@ -57,17 +97,24 @@
         </div>
     </header>
 
+    <!-- ============================================
+         MAIN CONTENT
+         ============================================ -->
     <main class="portal-main">
+
+        <!-- Row 1: Cumulative Case Telemetry -->
         <section class="card-row">
             <h2 class="row-heading">Cumulative Case Telemetry</h2>
             <div class="cards-grid" id="caseTelemetryCards"></div>
         </section>
 
+        <!-- Row 2: Biological Coefficients -->
         <section class="card-row">
             <h2 class="row-heading">Biological Coefficients</h2>
             <div class="cards-grid" id="bioCoeffCards"></div>
         </section>
 
+        <!-- Row 3: Charts and Sliders -->
         <section class="analysis-row">
             <div class="charts-column" id="chartsColumn"></div>
             <aside class="slider-column">
@@ -86,34 +133,38 @@
             </aside>
         </section>
 
+        <!-- Row 4: Resources -->
         <section class="resources-section">
             <h2 class="row-heading">Resources</h2>
             <div class="resources-grid">
                 <a href="docs/sir-model.html" class="resource-card">
                     <span class="resource-icon">🦠</span>
                     <h3>SIR Model of Infectious Diseases</h3>
-                    <p>Understanding the Susceptible–Infectious–Recovered framework and its assumptions.</p>
+                    <p>Understanding the Susceptible–Infectious–Recovered framework, biological coefficients, and intervention dynamics.</p>
                 </a>
                 <a href="docs/ode.html" class="resource-card">
                     <span class="resource-icon">📐</span>
                     <h3>Ordinary Differential Equations</h3>
-                    <p>The mathematical foundation for compartmental modelling.</p>
+                    <p>The mathematical foundation for compartmental modelling, including time-varying transmission.</p>
                 </a>
                 <a href="docs/desolve.html" class="resource-card">
                     <span class="resource-icon">💻</span>
                     <h3>deSolve Package in R</h3>
-                    <p>Numerical solvers for ODE systems used in this analysis.</p>
+                    <p>Numerical solvers and calibration strategies for the intervention-aware SIRD system.</p>
                 </a>
                 <a href="docs/workflow.html" class="resource-card">
                     <span class="resource-icon">📊</span>
                     <h3>Analysis Workflow in R</h3>
-                    <p>Step-by-step data preparation, fitting, testing, and projection.</p>
+                    <p>Step-by-step data preparation, fitting, statistical validation, and anchored projection.</p>
                 </a>
             </div>
         </section>
+
     </main>
 
-    <!-- REVISED FOOTER: 3 centered lines -->
+    <!-- ============================================
+         FOOTER
+         ============================================ -->
     <footer class="portal-footer">
         <div class="footer-links">
             <a href="https://wawerujm.github.io" target="_blank" rel="noopener">James Waweru</a>
@@ -122,6 +173,9 @@
         </div>
     </footer>
 
+    <!-- ============================================
+         SCRIPT
+         ============================================ -->
     <script src="js/main.js" defer></script>
 </body>
 </html>
